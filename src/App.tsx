@@ -7,6 +7,11 @@ import Index from "./pages/Index";
 import Notes from "./pages/Notes";
 import NotesCalendar from "./pages/NotesCalendar";
 import Settings from "./pages/Settings";
+import Reminders from "./pages/Reminders";
+import Today from "./pages/todo/Today";
+import Upcoming from "./pages/todo/Upcoming";
+import TodoCalendar from "./pages/todo/TodoCalendar";
+import TodoSettings from "./pages/todo/TodoSettings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +27,11 @@ const App = () => (
           <Route path="/notes" element={<Notes />} />
           <Route path="/calendar" element={<NotesCalendar />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/reminders" element={<Reminders />} />
+          <Route path="/todo/today" element={<Today />} />
+          <Route path="/todo/upcoming" element={<Upcoming />} />
+          <Route path="/todo/calendar" element={<TodoCalendar />} />
+          <Route path="/todo/settings" element={<TodoSettings />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
