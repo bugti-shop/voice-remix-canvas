@@ -3,6 +3,19 @@ import { TodoItem } from '@/types/note';
 // Stub implementation for Google Calendar integration
 // This can be expanded with actual Google Calendar API integration
 
+export interface GoogleCalendar {
+  id: string;
+  summary: string;
+  backgroundColor?: string;
+  primary?: boolean;
+}
+
+export const getAccessToken = async (): Promise<string | null> => {
+  // Get stored access token from Supabase session or localStorage
+  const token = localStorage.getItem('googleAccessToken');
+  return token;
+};
+
 export const isGoogleCalendarEnabled = async (): Promise<boolean> => {
   // Check if Google Calendar integration is enabled
   const enabled = localStorage.getItem('googleCalendarEnabled');
