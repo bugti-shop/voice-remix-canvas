@@ -67,6 +67,8 @@ export const NoteEditor = ({ note, isOpen, onClose, onSave, defaultType = 'regul
   const [fontFamily, setFontFamily] = useState<string>('-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif');
   const [fontSize, setFontSize] = useState<string>('16px');
   const [fontWeight, setFontWeight] = useState<string>('400');
+  const [letterSpacing, setLetterSpacing] = useState<string>('0em');
+  const [isItalic, setIsItalic] = useState<boolean>(false);
   const [createdAt, setCreatedAt] = useState<Date>(new Date());
   const [createdTime, setCreatedTime] = useState<string>('12:00');
   const [reminderEnabled, setReminderEnabled] = useState(false);
@@ -109,6 +111,8 @@ export const NoteEditor = ({ note, isOpen, onClose, onSave, defaultType = 'regul
       setFontFamily(note.fontFamily || '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif');
       setFontSize(note.fontSize || '16px');
       setFontWeight(note.fontWeight || '400');
+      setLetterSpacing(note.letterSpacing || '0em');
+      setIsItalic(note.isItalic || false);
       const noteDate = new Date(note.createdAt);
       setCreatedAt(noteDate);
       setCreatedTime(format(noteDate, 'HH:mm'));
@@ -136,6 +140,8 @@ export const NoteEditor = ({ note, isOpen, onClose, onSave, defaultType = 'regul
       setFontFamily('-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif');
       setFontSize('16px');
       setFontWeight('400');
+      setLetterSpacing('0em');
+      setIsItalic(false);
       const now = new Date();
       setCreatedAt(now);
       setCreatedTime(format(now, 'HH:mm'));
@@ -197,6 +203,8 @@ export const NoteEditor = ({ note, isOpen, onClose, onSave, defaultType = 'regul
       fontFamily: (noteType === 'sticky' || noteType === 'lined' || noteType === 'regular') ? fontFamily : undefined,
       fontSize: (noteType === 'sticky' || noteType === 'lined' || noteType === 'regular') ? fontSize : undefined,
       fontWeight: (noteType === 'sticky' || noteType === 'lined' || noteType === 'regular') ? fontWeight : undefined,
+      letterSpacing: (noteType === 'sticky' || noteType === 'lined' || noteType === 'regular') ? letterSpacing : undefined,
+      isItalic: (noteType === 'sticky' || noteType === 'lined' || noteType === 'regular') ? isItalic : undefined,
       codeContent: noteType === 'code' ? codeContent : undefined,
       codeLanguage: noteType === 'code' ? codeLanguage : undefined,
       reminderEnabled,
@@ -457,6 +465,10 @@ export const NoteEditor = ({ note, isOpen, onClose, onSave, defaultType = 'regul
             onFontSizeChange={setFontSize}
             fontWeight={fontWeight}
             onFontWeightChange={setFontWeight}
+            letterSpacing={letterSpacing}
+            onLetterSpacingChange={setLetterSpacing}
+            isItalic={isItalic}
+            onItalicChange={setIsItalic}
           />
         )}
       </div>

@@ -87,6 +87,8 @@ export interface Note {
   fontFamily?: string;
   fontSize?: string;
   fontWeight?: string;
+  letterSpacing?: string;
+  isItalic?: boolean;
   reminderEnabled?: boolean;
   reminderTime?: Date;
   reminderRecurring?: 'none' | 'daily' | 'weekly' | 'monthly';
