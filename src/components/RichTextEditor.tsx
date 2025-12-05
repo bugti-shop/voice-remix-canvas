@@ -1,7 +1,26 @@
-import { useCallback, useRef, useEffect } from 'react';
+import { useCallback, useRef, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Bold, Italic, Underline as UnderlineIcon, List, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
+import {
+  Bold,
+  Italic,
+  Underline as UnderlineIcon,
+  Link as LinkIcon,
+  Image as ImageIcon,
+  List,
+  Palette,
+  Highlighter,
+  Undo,
+  Redo,
+  Type,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
+  TextCursorInput,
+} from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 interface RichTextEditorProps {
@@ -20,90 +39,669 @@ interface RichTextEditorProps {
   onFontSizeChange?: (fontSize: string) => void;
 }
 
+const COLORS = [
+  { name: 'Black', value: '#000000' },
+  { name: 'Red', value: '#EF4444' },
+  { name: 'Blue', value: '#3B82F6' },
+  { name: 'Green', value: '#10B981' },
+  { name: 'Yellow', value: '#F59E0B' },
+  { name: 'Purple', value: '#8B5CF6' },
+];
+
+const HIGHLIGHT_COLORS = [
+  { name: 'Yellow', value: '#FEF08A' },
+  { name: 'Green', value: '#BBF7D0' },
+  { name: 'Blue', value: '#BFDBFE' },
+  { name: 'Pink', value: '#FBCFE8' },
+  { name: 'Orange', value: '#FED7AA' },
+];
+
+const FONT_FAMILIES = [
+  { name: 'Default', value: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  { name: 'Inter', value: '"Inter", sans-serif' },
+  { name: 'Roboto', value: '"Roboto", sans-serif' },
+  { name: 'Open Sans', value: '"Open Sans", sans-serif' },
+  { name: 'Lato', value: '"Lato", sans-serif' },
+  { name: 'Montserrat', value: '"Montserrat", sans-serif' },
+  { name: 'Poppins', value: '"Poppins", sans-serif' },
+  { name: 'Raleway', value: '"Raleway", sans-serif' },
+  { name: 'Playfair Display', value: '"Playfair Display", serif' },
+  { name: 'Merriweather', value: '"Merriweather", serif' },
+  { name: 'Crimson Text', value: '"Crimson Text", serif' },
+  { name: 'Dancing Script', value: '"Dancing Script", cursive' },
+  { name: 'Pacifico', value: '"Pacifico", cursive' },
+  { name: 'Indie Flower', value: '"Indie Flower", cursive' },
+  { name: 'Shadows Into Light', value: '"Shadows Into Light", cursive' },
+  { name: 'Permanent Marker', value: '"Permanent Marker", cursive' },
+  { name: 'Courier Prime', value: '"Courier Prime", monospace' },
+  { name: 'Space Mono', value: '"Space Mono", monospace' },
+  { name: 'Fira Code', value: '"Fira Code", monospace' },
+  { name: 'Source Code Pro', value: '"Source Code Pro", monospace' },
+  { name: 'Noto Serif', value: '"Noto Serif", serif' },
+  { name: 'Nunito', value: '"Nunito", sans-serif' },
+  { name: 'Ubuntu', value: '"Ubuntu", sans-serif' },
+  { name: 'Quicksand', value: '"Quicksand", sans-serif' },
+  { name: 'Josefin Sans', value: '"Josefin Sans", sans-serif' },
+  { name: 'Work Sans', value: '"Work Sans", sans-serif' },
+  { name: 'PT Sans', value: '"PT Sans", sans-serif' },
+  { name: 'Cabin', value: '"Cabin", sans-serif' },
+  { name: 'Bebas Neue', value: '"Bebas Neue", cursive' },
+  { name: 'Oswald', value: '"Oswald", sans-serif' },
+  { name: 'Archivo', value: '"Archivo", sans-serif' },
+];
+
+const FONT_SIZES = [
+  { name: 'Small', value: '14px' },
+  { name: 'Medium', value: '16px' },
+  { name: 'Large', value: '20px' },
+  { name: 'Extra Large', value: '24px' },
+];
+
 export const RichTextEditor = ({
   content,
   onChange,
-  className,
-  toolbarPosition = 'bottom',
-  title,
+  onImageAdd,
+  allowImages = true,
+  className = '',
+  toolbarPosition = 'top',
+  title = '',
   onTitleChange,
   showTitle = false,
+  fontFamily = FONT_FAMILIES[0].value,
+  onFontFamilyChange,
+  fontSize = FONT_SIZES[1].value,
+  onFontSizeChange,
 }: RichTextEditorProps) => {
   const editorRef = useRef<HTMLDivElement>(null);
+  const [showLinkInput, setShowLinkInput] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const savedRangeRef = useRef<Range | null>(null);
+  const [history, setHistory] = useState<string[]>([content]);
+  const [historyIndex, setHistoryIndex] = useState(0);
 
-  useEffect(() => {
-    if (editorRef.current && editorRef.current.innerHTML !== content) {
-      editorRef.current.innerHTML = content;
-    }
-  }, []);
-
-  const handleInput = useCallback(() => {
-    if (editorRef.current) {
-      onChange(editorRef.current.innerHTML);
-    }
-  }, [onChange]);
-
-  const execCommand = (command: string, value?: string) => {
+  const execCommand = useCallback((command: string, value?: string) => {
+    editorRef.current?.focus();
     document.execCommand(command, false, value);
     editorRef.current?.focus();
-    handleInput();
+  }, []);
+
+  const handleBold = () => execCommand('bold');
+  const handleItalic = () => execCommand('italic');
+  const handleUnderline = () => execCommand('underline');
+  const handleBulletList = () => execCommand('insertUnorderedList');
+
+  const handleTextColor = (color: string) => {
+    execCommand('foreColor', color);
   };
 
-  const Toolbar = () => (
-    <div className="flex items-center gap-1 p-2 border-t bg-background flex-wrap">
-      <Button variant="ghost" size="sm" onClick={() => execCommand('bold')} className="h-8 w-8 p-0">
+  const handleHighlight = (color: string) => {
+    execCommand('hiliteColor', color);
+  };
+
+  const handleLink = () => {
+    if (linkUrl) {
+      const selection = window.getSelection();
+      if (savedRangeRef.current && selection) {
+        try {
+          selection.removeAllRanges();
+          selection.addRange(savedRangeRef.current);
+        } catch (e) {
+          // ignore
+        }
+      }
+      const selectedText = selection?.toString();
+      if (!selectedText) {
+        toast.error('Please select text first');
+        return;
+      }
+      execCommand('createLink', linkUrl);
+      setLinkUrl('');
+      setShowLinkInput(false);
+      toast.success('Link inserted');
+    }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const imageUrl = reader.result as string;
+
+        // Insert image at cursor position
+        if (editorRef.current) {
+          editorRef.current.focus();
+
+          const img = document.createElement('img');
+          img.src = imageUrl;
+          img.style.maxWidth = '100%';
+          img.style.height = 'auto';
+          img.style.display = 'block';
+          img.style.margin = '10px 0';
+
+          const selection = window.getSelection();
+          if (selection && selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            range.deleteContents();
+            range.insertNode(img);
+
+            // Move cursor after image
+            range.setStartAfter(img);
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
+          } else {
+            editorRef.current.appendChild(img);
+          }
+
+          // Trigger onChange to save content
+          handleInput();
+          toast.success('Image added');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleInput = () => {
+    if (editorRef.current) {
+      const newContent = editorRef.current.innerHTML;
+      onChange(newContent);
+
+      // Add to history
+      const newHistory = history.slice(0, historyIndex + 1);
+      newHistory.push(newContent);
+      setHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
+    }
+  };
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      const previousContent = history[newIndex];
+      if (editorRef.current) {
+        editorRef.current.innerHTML = previousContent;
+        onChange(previousContent);
+      }
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      const nextContent = history[newIndex];
+      if (editorRef.current) {
+        editorRef.current.innerHTML = nextContent;
+        onChange(nextContent);
+      }
+    }
+  };
+
+  const handleTextCase = (caseType: 'upper' | 'lower') => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      toast.error('Please select text first');
+      return;
+    }
+
+    const selectedText = selection.toString();
+    if (!selectedText) {
+      toast.error('Please select text first');
+      return;
+    }
+
+    const convertedText = caseType === 'upper'
+      ? selectedText.toUpperCase()
+      : selectedText.toLowerCase();
+
+    document.execCommand('insertText', false, convertedText);
+    toast.success(`Text converted to ${caseType === 'upper' ? 'uppercase' : 'lowercase'}`);
+  };
+
+  const handleAlignment = (alignment: 'left' | 'center' | 'right' | 'justify') => {
+    const commands = {
+      left: 'justifyLeft',
+      center: 'justifyCenter',
+      right: 'justifyRight',
+      justify: 'justifyFull',
+    };
+    execCommand(commands[alignment]);
+  };
+
+  // Set content when it changes
+  useEffect(() => {
+    if (editorRef.current && editorRef.current.innerHTML !== content) {
+      const selection = window.getSelection();
+      const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+      const offset = range?.startOffset;
+
+      editorRef.current.innerHTML = content;
+
+      // Restore cursor position
+      if (range && offset !== undefined) {
+        try {
+          range.setStart(range.startContainer, offset);
+          range.collapse(true);
+          selection?.removeAllRanges();
+          selection?.addRange(range);
+        } catch (e) {
+          // Cursor position restoration failed, ignore
+        }
+      }
+    }
+  }, [content]);
+
+  // Adjust toolbar position when the on-screen keyboard appears using VisualViewport
+  useEffect(() => {
+    const vv = (window as any).visualViewport as VisualViewport | undefined;
+    const setInset = () => {
+      if (!vv) return;
+      const bottomInset = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
+      document.documentElement.style.setProperty('--keyboard-inset', `${bottomInset}px`);
+    };
+    setInset();
+    if (vv) {
+      vv.addEventListener('resize', setInset);
+      vv.addEventListener('scroll', setInset);
+    }
+    return () => {
+      if (vv) {
+        vv.removeEventListener('resize', setInset);
+        vv.removeEventListener('scroll', setInset);
+      }
+    };
+  }, []);
+
+  const toolbar = (
+    <div className="flex flex-wrap gap-1 p-3 bg-background">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={handleUndo}
+        disabled={historyIndex <= 0}
+        className="h-8 w-8 p-0"
+        title="Undo"
+      >
+        <Undo className="h-4 w-4" />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={handleRedo}
+        disabled={historyIndex >= history.length - 1}
+        className="h-8 w-8 p-0"
+        title="Redo"
+      >
+        <Redo className="h-4 w-4" />
+      </Button>
+
+      <div className="w-px h-8 bg-border mx-1" />
+
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={handleBold}
+        className="h-8 w-8 p-0"
+        title="Bold"
+      >
         <Bold className="h-4 w-4" />
       </Button>
-      <Button variant="ghost" size="sm" onClick={() => execCommand('italic')} className="h-8 w-8 p-0">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={handleItalic}
+        className="h-8 w-8 p-0"
+        title="Italic"
+      >
         <Italic className="h-4 w-4" />
       </Button>
-      <Button variant="ghost" size="sm" onClick={() => execCommand('underline')} className="h-8 w-8 p-0">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={handleUnderline}
+        className="h-8 w-8 p-0"
+        title="Underline"
+      >
         <UnderlineIcon className="h-4 w-4" />
       </Button>
-      <div className="h-4 w-px bg-border mx-1" />
-      <Button variant="ghost" size="sm" onClick={() => execCommand('insertUnorderedList')} className="h-8 w-8 p-0">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={handleBulletList}
+        className="h-8 w-8 p-0"
+        title="Bullet List"
+      >
         <List className="h-4 w-4" />
       </Button>
-      <div className="h-4 w-px bg-border mx-1" />
-      <Button variant="ghost" size="sm" onClick={() => execCommand('justifyLeft')} className="h-8 w-8 p-0">
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0"
+            title="Text Color"
+          >
+            <Palette className="h-4 w-4" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-2">
+          <div className="grid grid-cols-3 gap-2">
+            {COLORS.map((color) => (
+              <button
+                key={color.value}
+                type="button"
+                onClick={() => handleTextColor(color.value)}
+                className="h-8 w-8 rounded border-2 border-border hover:scale-110 transition-transform"
+                style={{ backgroundColor: color.value }}
+                title={color.name}
+              />
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0"
+            title="Highlight"
+          >
+            <Highlighter className="h-4 w-4" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-2">
+          <div className="grid grid-cols-3 gap-2">
+            {HIGHLIGHT_COLORS.map((color) => (
+              <button
+                key={color.value}
+                type="button"
+                onClick={() => handleHighlight(color.value)}
+                className="h-8 w-8 rounded border-2 border-border hover:scale-110 transition-transform"
+                style={{ backgroundColor: color.value }}
+                title={color.name}
+              />
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <Popover open={showLinkInput} onOpenChange={(open) => {
+        setShowLinkInput(open);
+        if (open) {
+          const selection = window.getSelection();
+          if (selection && selection.rangeCount > 0) {
+            savedRangeRef.current = selection.getRangeAt(0).cloneRange();
+          }
+        }
+      }}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0"
+            title="Insert Link"
+          >
+            <LinkIcon className="h-4 w-4" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-80">
+          <div className="space-y-2">
+            <Input
+              placeholder="Enter URL..."
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleLink()}
+            />
+            <Button onClick={handleLink} className="w-full" size="sm">
+              Insert Link
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      {allowImages && onImageAdd && (
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            className="h-8 w-8 p-0"
+            title="Add Image"
+          >
+            <ImageIcon className="h-4 w-4" />
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
+            className="hidden"
+          />
+        </>
+      )}
+
+      <div className="w-px h-8 bg-border mx-1" />
+
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => handleAlignment('left')}
+        className="h-8 w-8 p-0"
+        title="Align Left"
+      >
         <AlignLeft className="h-4 w-4" />
       </Button>
-      <Button variant="ghost" size="sm" onClick={() => execCommand('justifyCenter')} className="h-8 w-8 p-0">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => handleAlignment('center')}
+        className="h-8 w-8 p-0"
+        title="Align Center"
+      >
         <AlignCenter className="h-4 w-4" />
       </Button>
-      <Button variant="ghost" size="sm" onClick={() => execCommand('justifyRight')} className="h-8 w-8 p-0">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => handleAlignment('right')}
+        className="h-8 w-8 p-0"
+        title="Align Right"
+      >
         <AlignRight className="h-4 w-4" />
       </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => handleAlignment('justify')}
+        className="h-8 w-8 p-0"
+        title="Justify"
+      >
+        <AlignJustify className="h-4 w-4" />
+      </Button>
+
+      <div className="w-px h-8 bg-border mx-1" />
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0"
+            title="Text Case"
+          >
+            <Type className="h-4 w-4" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-2">
+          <div className="flex flex-col gap-2">
+            <Button onClick={() => handleTextCase('upper')} size="sm">
+              UPPERCASE
+            </Button>
+            <Button onClick={() => handleTextCase('lower')} size="sm">
+              lowercase
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      {onFontFamilyChange && (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2"
+              title="Font Family"
+            >
+              <span className="text-xs font-semibold">Aa</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 max-h-96 overflow-y-auto">
+            <div className="flex flex-col gap-1">
+              {FONT_FAMILIES.map((font) => (
+                <Button
+                  key={font.value}
+                  onClick={() => onFontFamilyChange(font.value)}
+                  variant={fontFamily === font.value ? 'default' : 'ghost'}
+                  size="sm"
+                  className="justify-start"
+                  style={{ fontFamily: font.value }}
+                >
+                  {font.name}
+                </Button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
+
+      {onFontSizeChange && (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2"
+              title="Font Size"
+            >
+              <TextCursorInput className="h-4 w-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-2">
+            <div className="flex flex-col gap-1">
+              {FONT_SIZES.map((size) => (
+                <Button
+                  key={size.value}
+                  onClick={() => onFontSizeChange(size.value)}
+                  variant={fontSize === size.value ? 'default' : 'ghost'}
+                  size="sm"
+                  className="justify-start"
+                >
+                  {size.name}
+                </Button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
     </div>
   );
 
   return (
-    <div className="flex flex-col h-full">
-      {toolbarPosition === 'top' && <Toolbar />}
-      
-      <div className="flex-1 overflow-auto p-4">
-        {showTitle && onTitleChange && (
-          <Input
-            value={title || ''}
-            onChange={(e) => onTitleChange(e.target.value)}
-            className="text-2xl font-bold border-none bg-transparent p-0 mb-4 focus-visible:ring-0"
-            placeholder="Note Title..."
-          />
-        )}
-        <div
-          ref={editorRef}
-          contentEditable
-          onInput={handleInput}
-          className={cn(
-            'min-h-[200px] outline-none text-base leading-relaxed',
-            '[&_ul]:list-disc [&_ul]:ml-6 [&_ol]:list-decimal [&_ol]:ml-6',
-            className
-          )}
-          data-placeholder="Start typing..."
-        />
-      </div>
+    <div className="w-full h-full flex flex-col">
+      <style>
+        {`
+          .rich-text-editor a {
+            color: #3B82F6;
+            text-decoration: underline;
+          }
+          .rich-text-editor ul {
+            list-style: disc;
+            padding-left: 2rem;
+          }
+          /* Ensure smooth mobile scrolling inside the editor */
+          .rich-text-editor__scroll {
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+            touch-action: pan-y;
+          }
+          .title-input {
+            font-size: 1.5rem;
+            font-weight: bold;
+            border: none;
+            outline: none;
+            background: transparent;
+            width: 100%;
+            padding: 1rem 1rem 0.5rem 1rem;
+          }
+          .title-input::placeholder {
+            color: rgba(0, 0, 0, 0.3);
+          }
+        `}
+      </style>
 
-      {toolbarPosition === 'bottom' && <Toolbar />}
+      {toolbarPosition === 'top' && toolbar}
+
+      {showTitle && onTitleChange && (
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => onTitleChange(e.target.value)}
+          placeholder="Title"
+          className="title-input"
+          style={{ fontFamily }}
+        />
+      )}
+
+      <div
+        ref={editorRef}
+        contentEditable
+        onInput={handleInput}
+        className={cn(
+          "rich-text-editor flex-1 min-h-0 p-4 border-0 focus:outline-none overflow-y-auto pb-32 rich-text-editor__scroll",
+          showTitle ? "pt-2" : "",
+          className
+        )}
+        style={{
+          paddingBottom: 'calc(8rem + var(--keyboard-inset, 0px))',
+          fontFamily,
+          fontSize
+        }}
+        suppressContentEditableWarning
+      />
+
+      {toolbarPosition === 'bottom' && (
+        <div
+          className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t safe-area-bottom"
+          style={{ bottom: 'calc(env(safe-area-inset-bottom) + var(--keyboard-inset, 0px))' }}
+        >
+          {toolbar}
+        </div>
+      )}
     </div>
   );
 };
