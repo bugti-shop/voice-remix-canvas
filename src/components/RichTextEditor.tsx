@@ -502,41 +502,6 @@ export const RichTextEditor = ({
         </PopoverContent>
       </Popover>
 
-      <Popover open={showLinkInput} onOpenChange={(open) => {
-        setShowLinkInput(open);
-        if (open) {
-          const selection = window.getSelection();
-          if (selection && selection.rangeCount > 0) {
-            savedRangeRef.current = selection.getRangeAt(0).cloneRange();
-          }
-        }
-      }}>
-        <PopoverTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0"
-            title="Insert Link"
-          >
-            <LinkIcon className="h-4 w-4" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-80">
-          <div className="space-y-2">
-            <Input
-              placeholder="Enter URL..."
-              value={linkUrl}
-              onChange={(e) => setLinkUrl(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleLink()}
-            />
-            <Button onClick={handleLink} className="w-full" size="sm">
-              Insert Link
-            </Button>
-          </div>
-        </PopoverContent>
-      </Popover>
-
       {allowImages && onImageAdd && (
         <>
           <Button
