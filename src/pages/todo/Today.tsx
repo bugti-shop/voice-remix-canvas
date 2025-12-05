@@ -1,50 +1,27 @@
 import { useState, useEffect, useMemo } from 'react';
-import { TodoItem, Folder, Priority } from '@/types/note';
-import { Input } from '@/components/ui/input';
-import { Plus, FolderIcon, Edit2, X, CheckSquare, Trash2, FolderInput, Flag, Filter, ChevronRight, ChevronDown, MoreVertical, Eye, EyeOff, ArrowUpDown } from 'lucide-react';
+import { TodoItem, Folder, Priority, Note } from '@/types/note';
+import { Plus, FolderIcon, ChevronRight, ChevronDown, MoreVertical, Eye, EyeOff, ArrowUpDown, Copy, MousePointer2, FolderPlus, Settings, LayoutList, LayoutGrid, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { TaskInputSheet } from '@/components/TaskInputSheet';
 import { TaskDetailSheet } from '@/components/TaskDetailSheet';
 import { TaskItem } from '@/components/TaskItem';
 import { TaskOptionsSheet, GroupBy, SortBy } from '@/components/TaskOptionsSheet';
+import { DuplicateOptionsSheet, DuplicateOption } from '@/components/DuplicateOptionsSheet';
+import { FolderManageSheet } from '@/components/FolderManageSheet';
+import { MoveToFolderSheet } from '@/components/MoveToFolderSheet';
+import { SelectActionsSheet, SelectAction } from '@/components/SelectActionsSheet';
+import { PrioritySelectSheet } from '@/components/PrioritySelectSheet';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { notificationManager } from '@/utils/notifications';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Checkbox } from '@/components/ui/checkbox';
 import { TodoLayout } from './TodoLayout';
+import { toast } from 'sonner';
+
+type ViewMode = 'card' | 'flat';
 
 const Today = () => {
   const [items, setItems] = useState<TodoItem[]>([]);
@@ -54,18 +31,19 @@ const Today = () => {
   const [isInputOpen, setIsInputOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<TodoItem | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [folderToDelete, setFolderToDelete] = useState<Folder | null>(null);
-  const [folderToEdit, setFolderToEdit] = useState<Folder | null>(null);
-  const [editFolderName, setEditFolderName] = useState('');
-  const [editFolderColor, setEditFolderColor] = useState('');
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
-  const [folderClickCounts, setFolderClickCounts] = useState<Record<string, number>>({});
   const [isCompletedOpen, setIsCompletedOpen] = useState(false);
   const [showCompleted, setShowCompleted] = useState(true);
   const [isOptionsSheetOpen, setIsOptionsSheetOpen] = useState(false);
+  const [isDuplicateSheetOpen, setIsDuplicateSheetOpen] = useState(false);
+  const [isFolderManageOpen, setIsFolderManageOpen] = useState(false);
+  const [isMoveToFolderOpen, setIsMoveToFolderOpen] = useState(false);
+  const [isSelectActionsOpen, setIsSelectActionsOpen] = useState(false);
+  const [isPrioritySheetOpen, setIsPrioritySheetOpen] = useState(false);
   const [groupBy, setGroupBy] = useState<GroupBy>('custom');
   const [sortBy, setSortBy] = useState<SortBy>('custom');
+  const [viewMode, setViewMode] = useState<ViewMode>('card');
 
   useEffect(() => {
     const saved = localStorage.getItem('todoItems');
@@ -83,67 +61,38 @@ const Today = () => {
     const savedFolders = localStorage.getItem('todoFolders');
     if (savedFolders) {
       const parsed = JSON.parse(savedFolders);
-      setFolders(parsed.map((f: Folder) => ({
-        ...f,
-        createdAt: new Date(f.createdAt)
-      })));
+      setFolders(parsed.map((f: Folder) => ({ ...f, createdAt: new Date(f.createdAt) })));
     }
 
-    // Load saved preferences
     const savedShowCompleted = localStorage.getItem('todoShowCompleted');
     if (savedShowCompleted !== null) setShowCompleted(JSON.parse(savedShowCompleted));
     const savedGroupBy = localStorage.getItem('todoGroupBy');
     if (savedGroupBy) setGroupBy(savedGroupBy as GroupBy);
     const savedSortBy = localStorage.getItem('todoSortBy');
     if (savedSortBy) setSortBy(savedSortBy as SortBy);
+    const savedViewMode = localStorage.getItem('todoViewMode');
+    if (savedViewMode) setViewMode(savedViewMode as ViewMode);
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem('todoItems', JSON.stringify(items));
-  }, [items]);
-
-  useEffect(() => {
-    localStorage.setItem('todoFolders', JSON.stringify(folders));
-  }, [folders]);
-
-  useEffect(() => {
-    localStorage.setItem('todoShowCompleted', JSON.stringify(showCompleted));
-  }, [showCompleted]);
-
-  useEffect(() => {
-    localStorage.setItem('todoGroupBy', groupBy);
-    localStorage.setItem('todoSortBy', sortBy);
-  }, [groupBy, sortBy]);
+  useEffect(() => { localStorage.setItem('todoItems', JSON.stringify(items)); }, [items]);
+  useEffect(() => { localStorage.setItem('todoFolders', JSON.stringify(folders)); }, [folders]);
+  useEffect(() => { localStorage.setItem('todoShowCompleted', JSON.stringify(showCompleted)); }, [showCompleted]);
+  useEffect(() => { localStorage.setItem('todoGroupBy', groupBy); localStorage.setItem('todoSortBy', sortBy); }, [groupBy, sortBy]);
+  useEffect(() => { localStorage.setItem('todoViewMode', viewMode); }, [viewMode]);
 
   const handleCreateFolder = (name: string, color: string) => {
-    const newFolder: Folder = {
-      id: Date.now().toString(),
-      name,
-      color,
-      isDefault: false,
-      createdAt: new Date(),
-    };
+    const newFolder: Folder = { id: Date.now().toString(), name, color, isDefault: false, createdAt: new Date() };
     setFolders([...folders, newFolder]);
   };
 
-  const handleEditFolder = () => {
-    if (!folderToEdit || !editFolderName.trim()) return;
-    const updatedFolders = folders.map(f =>
-      f.id === folderToEdit.id ? { ...f, name: editFolderName, color: editFolderColor } : f
-    );
-    setFolders(updatedFolders);
-    setFolderToEdit(null);
+  const handleEditFolder = (folderId: string, name: string, color: string) => {
+    setFolders(folders.map(f => f.id === folderId ? { ...f, name, color } : f));
   };
 
-  const handleDeleteFolder = () => {
-    if (!folderToDelete) return;
-    const updatedItems = items.map(item =>
-      item.folderId === folderToDelete.id ? { ...item, folderId: undefined } : item
-    );
-    setItems(updatedItems);
-    setFolders(folders.filter(f => f.id !== folderToDelete.id));
-    if (selectedFolderId === folderToDelete.id) setSelectedFolderId(null);
-    setFolderToDelete(null);
+  const handleDeleteFolder = (folderId: string) => {
+    setItems(items.map(item => item.folderId === folderId ? { ...item, folderId: undefined } : item));
+    setFolders(folders.filter(f => f.id !== folderId));
+    if (selectedFolderId === folderId) setSelectedFolderId(null);
   };
 
   const handleAddTask = async (task: Omit<TodoItem, 'id' | 'completed'>) => {
@@ -155,8 +104,7 @@ const Today = () => {
   };
 
   const updateItem = async (itemId: string, updates: Partial<TodoItem>) => {
-    const updatedItems = items.map((i) => (i.id === itemId ? { ...i, ...updates } : i));
-    setItems(updatedItems);
+    setItems(items.map((i) => (i.id === itemId ? { ...i, ...updates } : i)));
   };
 
   const deleteItem = async (itemId: string) => {
@@ -179,13 +127,108 @@ const Today = () => {
     });
   };
 
-  const handleBulkDelete = async () => {
-    setItems(items.filter(item => !selectedTaskIds.has(item.id)));
-    setSelectedTaskIds(new Set());
-    setIsSelectionMode(false);
+  const handleDuplicate = (option: DuplicateOption) => {
+    const filteredItems = selectedFolderId ? items.filter(i => i.folderId === selectedFolderId) : items;
+    let toDuplicate: TodoItem[] = [];
+
+    if (option === 'uncompleted') {
+      toDuplicate = filteredItems.filter(i => !i.completed);
+    } else {
+      toDuplicate = filteredItems;
+    }
+
+    const duplicated = toDuplicate.map((item, idx) => ({
+      ...item,
+      id: `${Date.now()}-${idx}`,
+      completed: option === 'all-reset' ? false : item.completed,
+      text: `${item.text} (Copy)`
+    }));
+
+    setItems([...duplicated, ...items]);
+    toast.success(`Duplicated ${duplicated.length} task(s)`);
   };
 
-  // Filter and sort items
+  const handleSelectAction = (action: SelectAction) => {
+    const selectedItems = items.filter(i => selectedTaskIds.has(i.id));
+    
+    switch (action) {
+      case 'move':
+        setIsMoveToFolderOpen(true);
+        break;
+      case 'delete':
+        setItems(items.filter(i => !selectedTaskIds.has(i.id)));
+        setSelectedTaskIds(new Set());
+        setIsSelectionMode(false);
+        toast.success(`Deleted ${selectedItems.length} task(s)`);
+        break;
+      case 'complete':
+        setItems(items.map(i => selectedTaskIds.has(i.id) ? { ...i, completed: true } : i));
+        setSelectedTaskIds(new Set());
+        setIsSelectionMode(false);
+        toast.success(`Completed ${selectedItems.length} task(s)`);
+        break;
+      case 'pin':
+        toast.success(`Pinned ${selectedItems.length} task(s)`);
+        setSelectedTaskIds(new Set());
+        setIsSelectionMode(false);
+        break;
+      case 'priority':
+        setIsPrioritySheetOpen(true);
+        break;
+      case 'duplicate':
+        const duplicated = selectedItems.map((item, idx) => ({
+          ...item,
+          id: `${Date.now()}-${idx}`,
+          completed: false,
+          text: `${item.text} (Copy)`
+        }));
+        setItems([...duplicated, ...items]);
+        setSelectedTaskIds(new Set());
+        setIsSelectionMode(false);
+        toast.success(`Duplicated ${selectedItems.length} task(s)`);
+        break;
+      case 'convert':
+        convertToNotes(selectedItems);
+        break;
+    }
+    setIsSelectActionsOpen(false);
+  };
+
+  const handleMoveToFolder = (folderId: string | null) => {
+    setItems(items.map(i => selectedTaskIds.has(i.id) ? { ...i, folderId: folderId || undefined } : i));
+    setSelectedTaskIds(new Set());
+    setIsSelectionMode(false);
+    toast.success(`Moved ${selectedTaskIds.size} task(s)`);
+  };
+
+  const handleSetPriority = (priority: Priority) => {
+    setItems(items.map(i => selectedTaskIds.has(i.id) ? { ...i, priority } : i));
+    setSelectedTaskIds(new Set());
+    setIsSelectionMode(false);
+    toast.success(`Updated priority for ${selectedTaskIds.size} task(s)`);
+  };
+
+  const convertToNotes = (tasksToConvert: TodoItem[]) => {
+    const existingNotes: Note[] = JSON.parse(localStorage.getItem('notes') || '[]');
+    
+    const newNotes: Note[] = tasksToConvert.map((task, idx) => ({
+      id: `${Date.now()}-${idx}`,
+      type: 'regular' as const,
+      title: task.text,
+      content: task.description || '',
+      voiceRecordings: [],
+      images: task.imageUrl ? [task.imageUrl] : [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }));
+
+    localStorage.setItem('notes', JSON.stringify([...newNotes, ...existingNotes]));
+    setItems(items.filter(i => !tasksToConvert.some(t => t.id === i.id)));
+    setSelectedTaskIds(new Set());
+    setIsSelectionMode(false);
+    toast.success(`Converted ${tasksToConvert.length} task(s) to notes`);
+  };
+
   const processedItems = useMemo(() => {
     let filtered = items.filter(item => {
       const folderMatch = selectedFolderId ? item.folderId === selectedFolderId : true;
@@ -193,7 +236,6 @@ const Today = () => {
       return folderMatch && priorityMatch;
     });
 
-    // Sort items
     if (sortBy === 'date') {
       filtered = [...filtered].sort((a, b) => {
         const dateA = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
@@ -202,9 +244,7 @@ const Today = () => {
       });
     } else if (sortBy === 'priority') {
       const priorityOrder: Record<Priority | 'none', number> = { high: 0, medium: 1, low: 2, none: 3 };
-      filtered = [...filtered].sort((a, b) => {
-        return (priorityOrder[a.priority || 'none'] || 3) - (priorityOrder[b.priority || 'none'] || 3);
-      });
+      filtered = [...filtered].sort((a, b) => (priorityOrder[a.priority || 'none'] || 3) - (priorityOrder[b.priority || 'none'] || 3));
     }
 
     return filtered;
@@ -213,25 +253,43 @@ const Today = () => {
   const uncompletedItems = processedItems.filter(item => !item.completed);
   const completedItems = processedItems.filter(item => item.completed);
 
-  // Group items by groupBy setting
   const groupedItems = useMemo(() => {
     if (groupBy === 'custom') return null;
-
     const groups: Record<string, TodoItem[]> = {};
-    
     uncompletedItems.forEach(item => {
       let key = 'No Group';
-      if (groupBy === 'date') {
-        key = item.dueDate ? new Date(item.dueDate).toLocaleDateString() : 'No Date';
-      } else if (groupBy === 'priority') {
-        key = item.priority ? item.priority.charAt(0).toUpperCase() + item.priority.slice(1) : 'No Priority';
-      }
+      if (groupBy === 'date') key = item.dueDate ? new Date(item.dueDate).toLocaleDateString() : 'No Date';
+      else if (groupBy === 'priority') key = item.priority ? item.priority.charAt(0).toUpperCase() + item.priority.slice(1) : 'No Priority';
       if (!groups[key]) groups[key] = [];
       groups[key].push(item);
     });
-
     return groups;
   }, [uncompletedItems, groupBy]);
+
+  const renderTaskItem = (item: TodoItem) => (
+    viewMode === 'flat' ? (
+      <div key={item.id} className="flex items-center gap-3 py-2 px-1 border-b border-border/50">
+        {isSelectionMode && (
+          <Checkbox checked={selectedTaskIds.has(item.id)} onCheckedChange={() => handleSelectTask(item.id)} className="h-5 w-5" />
+        )}
+        <Checkbox
+          checked={item.completed}
+          onCheckedChange={async (checked) => {
+            if (checked && !item.completed) {
+              try { await Haptics.impact({ style: ImpactStyle.Heavy }); } catch {}
+            }
+            updateItem(item.id, { completed: !!checked });
+          }}
+          className={cn("h-5 w-5", item.completed && "border-muted-foreground/50")}
+        />
+        <span className={cn("flex-1 text-sm", item.completed && "line-through text-muted-foreground")} onClick={() => setSelectedTask(item)}>
+          {item.text}
+        </span>
+      </div>
+    ) : (
+      <TaskItem key={item.id} item={item} onUpdate={updateItem} onDelete={deleteItem} onTaskClick={setSelectedTask} onImageClick={setSelectedImage} isSelected={selectedTaskIds.has(item.id)} isSelectionMode={isSelectionMode} onSelect={handleSelectTask} />
+    )
+  );
 
   return (
     <TodoLayout title="Today">
@@ -257,8 +315,25 @@ const Today = () => {
                       {showCompleted ? 'Hide Completed' : 'Show Completed'}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setIsOptionsSheetOpen(true)} className="cursor-pointer">
-                      <ArrowUpDown className="h-4 w-4 mr-2" />
-                      Group & Sort
+                      <ArrowUpDown className="h-4 w-4 mr-2" />Group & Sort
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setIsDuplicateSheetOpen(true)} className="cursor-pointer">
+                      <Copy className="h-4 w-4 mr-2" />Duplicate
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { setIsSelectionMode(true); setIsSelectActionsOpen(true); }} className="cursor-pointer">
+                      <MousePointer2 className="h-4 w-4 mr-2" />Select
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setIsFolderManageOpen(true)} className="cursor-pointer">
+                      <FolderPlus className="h-4 w-4 mr-2" />Create Folder
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setIsFolderManageOpen(true)} className="cursor-pointer">
+                      <Settings className="h-4 w-4 mr-2" />Manage Folders
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setViewMode(viewMode === 'card' ? 'flat' : 'card')} className="cursor-pointer">
+                      {viewMode === 'card' ? <LayoutList className="h-4 w-4 mr-2" /> : <LayoutGrid className="h-4 w-4 mr-2" />}
+                      {viewMode === 'card' ? 'Flat Layout' : 'Card Layout'}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -280,7 +355,12 @@ const Today = () => {
           {isSelectionMode && selectedTaskIds.size > 0 && (
             <div className="fixed bottom-20 left-4 right-4 z-40 bg-card border rounded-lg shadow-lg p-4">
               <p className="text-sm mb-3 font-medium">{selectedTaskIds.size} task(s) selected</p>
-              <Button variant="outline" size="sm" onClick={handleBulkDelete}><Trash2 className="h-4 w-4 mr-2" />Delete</Button>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setIsSelectActionsOpen(true)}>Actions</Button>
+                <Button variant="outline" size="sm" onClick={() => { setItems(items.filter(i => !selectedTaskIds.has(i.id))); setSelectedTaskIds(new Set()); setIsSelectionMode(false); }}>
+                  <Trash2 className="h-4 w-4 mr-2" />Delete
+                </Button>
+              </div>
             </div>
           )}
 
@@ -289,25 +369,17 @@ const Today = () => {
             <div className="text-center py-20"><p className="text-muted-foreground">No tasks yet. Tap "Add Task" to get started!</p></div>
           ) : (
             <div className="space-y-4">
-              {/* Grouped or ungrouped uncompleted items */}
               {groupBy !== 'custom' && groupedItems ? (
                 Object.entries(groupedItems).map(([groupName, groupTasks]) => (
                   <div key={groupName} className="space-y-2">
                     <h3 className="text-sm font-semibold text-muted-foreground px-2">{groupName}</h3>
-                    {groupTasks.map((item) => (
-                      <TaskItem key={item.id} item={item} onUpdate={updateItem} onDelete={deleteItem} onTaskClick={setSelectedTask} onImageClick={setSelectedImage} isSelected={selectedTaskIds.has(item.id)} isSelectionMode={isSelectionMode} onSelect={handleSelectTask} />
-                    ))}
+                    {groupTasks.map(renderTaskItem)}
                   </div>
                 ))
               ) : uncompletedItems.length > 0 && (
-                <div className="space-y-2">
-                  {uncompletedItems.map((item) => (
-                    <TaskItem key={item.id} item={item} onUpdate={updateItem} onDelete={deleteItem} onTaskClick={setSelectedTask} onImageClick={setSelectedImage} isSelected={selectedTaskIds.has(item.id)} isSelectionMode={isSelectionMode} onSelect={handleSelectTask} />
-                  ))}
-                </div>
+                <div className="space-y-2">{uncompletedItems.map(renderTaskItem)}</div>
               )}
 
-              {/* Completed items */}
               {showCompleted && completedItems.length > 0 && (
                 <Collapsible open={isCompletedOpen} onOpenChange={setIsCompletedOpen}>
                   <div className="bg-muted/50 rounded-xl p-3 border border-border/30">
@@ -317,11 +389,7 @@ const Today = () => {
                         <div className="flex items-center gap-2 text-muted-foreground"><span className="text-sm font-medium">{completedItems.length}</span>{isCompletedOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</div>
                       </button>
                     </CollapsibleTrigger>
-                    <CollapsibleContent className="space-y-2 mt-2">
-                      {completedItems.map((item) => (
-                        <TaskItem key={item.id} item={item} onUpdate={updateItem} onDelete={deleteItem} onTaskClick={setSelectedTask} onImageClick={setSelectedImage} isSelected={selectedTaskIds.has(item.id)} isSelectionMode={isSelectionMode} onSelect={handleSelectTask} />
-                      ))}
-                    </CollapsibleContent>
+                    <CollapsibleContent className="space-y-2 mt-2">{completedItems.map(renderTaskItem)}</CollapsibleContent>
                   </div>
                 </Collapsible>
               )}
@@ -337,6 +405,11 @@ const Today = () => {
       <TaskInputSheet isOpen={isInputOpen} onClose={() => setIsInputOpen(false)} onAddTask={handleAddTask} folders={folders} selectedFolderId={selectedFolderId} onCreateFolder={handleCreateFolder} />
       <TaskDetailSheet isOpen={!!selectedTask} task={selectedTask} onClose={() => setSelectedTask(null)} onUpdate={(updatedTask) => { updateItem(updatedTask.id, updatedTask); setSelectedTask(updatedTask); }} onDelete={deleteItem} onDuplicate={duplicateTask} />
       <TaskOptionsSheet isOpen={isOptionsSheetOpen} onClose={() => setIsOptionsSheetOpen(false)} groupBy={groupBy} sortBy={sortBy} onGroupByChange={setGroupBy} onSortByChange={setSortBy} />
+      <DuplicateOptionsSheet isOpen={isDuplicateSheetOpen} onClose={() => setIsDuplicateSheetOpen(false)} onSelect={handleDuplicate} />
+      <FolderManageSheet isOpen={isFolderManageOpen} onClose={() => setIsFolderManageOpen(false)} folders={folders} onCreateFolder={handleCreateFolder} onEditFolder={handleEditFolder} onDeleteFolder={handleDeleteFolder} />
+      <MoveToFolderSheet isOpen={isMoveToFolderOpen} onClose={() => setIsMoveToFolderOpen(false)} folders={folders} onSelect={handleMoveToFolder} />
+      <SelectActionsSheet isOpen={isSelectActionsOpen} onClose={() => setIsSelectActionsOpen(false)} selectedCount={selectedTaskIds.size} onAction={handleSelectAction} />
+      <PrioritySelectSheet isOpen={isPrioritySheetOpen} onClose={() => setIsPrioritySheetOpen(false)} onSelect={handleSetPriority} />
 
       <Dialog open={!!selectedImage} onOpenChange={(open) => !open && setSelectedImage(null)}>
         <DialogContent className="max-w-3xl"><DialogHeader><DialogTitle>Task Image</DialogTitle></DialogHeader>
