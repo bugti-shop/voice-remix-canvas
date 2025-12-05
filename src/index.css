@@ -77,6 +77,24 @@
     min-width: 260px;
     min-height: 200px;
   }
+
+  .lined-note {
+    --line-gap: 1.5em;
+    background-color: white !important;
+    background-image: repeating-linear-gradient(
+      transparent,
+      transparent calc(var(--line-gap) - 1px),
+      hsl(var(--muted-foreground) / 0.3) calc(var(--line-gap) - 1px),
+      hsl(var(--muted-foreground) / 0.3) var(--line-gap)
+    );
+    background-size: 100% var(--line-gap);
+    background-attachment: local;
+    line-height: var(--line-gap) !important;
+  }
+
+  .dark .lined-note {
+    background-color: hsl(var(--background)) !important;
+  }
 }
 
 @layer base {
