@@ -957,7 +957,8 @@ export const RichTextEditor = ({
         onInput={handleInput}
         className={cn(
           "rich-text-editor flex-1 min-h-0 p-4 border-0 focus:outline-none overflow-y-auto pb-32 rich-text-editor__scroll",
-          showTitle ? "pt-2" : "",
+          // Don't add pt-2 for lined notes - let CSS padding-top handle it
+          showTitle && !className?.includes('lined-note') ? "pt-2" : "",
           className
         )}
         style={{
@@ -966,7 +967,8 @@ export const RichTextEditor = ({
           fontSize,
           fontWeight,
           letterSpacing,
-          lineHeight,
+          // Don't override lineHeight for lined notes - let CSS handle it
+          lineHeight: className?.includes('lined-note') ? undefined : lineHeight,
           fontStyle: isItalic ? 'italic' : 'normal'
         }}
         suppressContentEditableWarning
