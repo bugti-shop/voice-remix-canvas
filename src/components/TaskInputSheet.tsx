@@ -4,6 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { notificationManager } from '@/utils/notifications';
+import { toast } from 'sonner';
 import {
   Calendar as CalendarIcon,
   Flag,
@@ -15,7 +17,8 @@ import {
   Mic,
   MoreHorizontal,
   Timer,
-  Clock
+  Clock,
+  Bell
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -95,7 +98,7 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
     inputRef.current?.focus();
   };
 
-  const handleSetReminder = (time: string) => {
+  const handleSetReminder = async (time: string) => {
     const [hours, minutes] = time.split(':').map(Number);
     const reminderDate = new Date();
     reminderDate.setHours(hours, minutes, 0, 0);
@@ -104,8 +107,24 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
       reminderDate.setDate(reminderDate.getDate() + 1);
     }
 
+    // Request notification permissions
+    try {
+      const hasPermission = await notificationManager.checkPermissions();
+      if (!hasPermission) {
+        const granted = await notificationManager.requestPermissions();
+        if (!granted) {
+          toast.error('Notification permission denied. Reminders may not work.');
+        } else {
+          toast.success('Notifications enabled for reminders');
+        }
+      }
+    } catch (error) {
+      console.log('Running in web mode - native notifications not available');
+    }
+
     setReminderTime(reminderDate);
     setShowTimePicker(false);
+    toast.success(`Reminder set for ${format(reminderDate, 'h:mm a')}`);
   };
 
   const getRepeatLabel = () => {
