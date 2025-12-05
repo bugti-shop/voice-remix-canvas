@@ -43,6 +43,8 @@ interface RichTextEditorProps {
   onLetterSpacingChange?: (letterSpacing: string) => void;
   isItalic?: boolean;
   onItalicChange?: (isItalic: boolean) => void;
+  lineHeight?: string;
+  onLineHeightChange?: (lineHeight: string) => void;
 }
 
 const COLORS = [
@@ -141,6 +143,14 @@ const LETTER_SPACINGS = [
   { name: 'Widest', value: '0.2em', sample: 'Maximum space' },
 ];
 
+const LINE_HEIGHTS = [
+  { name: 'Compact', value: '1.2', sample: 'Tight lines' },
+  { name: 'Normal', value: '1.5', sample: 'Default height' },
+  { name: 'Relaxed', value: '1.75', sample: 'More breathing room' },
+  { name: 'Loose', value: '2', sample: 'Double spaced' },
+  { name: 'Extra Loose', value: '2.5', sample: 'Maximum space' },
+];
+
 export const RichTextEditor = ({
   content,
   onChange,
@@ -161,6 +171,8 @@ export const RichTextEditor = ({
   onLetterSpacingChange,
   isItalic = false,
   onItalicChange,
+  lineHeight = LINE_HEIGHTS[1].value,
+  onLineHeightChange,
 }: RichTextEditorProps) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const [showLinkInput, setShowLinkInput] = useState(false);
@@ -834,6 +846,62 @@ export const RichTextEditor = ({
           </PopoverContent>
         </Popover>
       )}
+
+      {onLineHeightChange && (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2"
+              title="Line Height"
+            >
+              <span className="text-xs font-semibold">↕</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-2">
+            <div className="p-2 border-b mb-2">
+              <h4 className="font-semibold text-sm">Line Height</h4>
+            </div>
+            <div className="flex flex-col gap-1">
+              {LINE_HEIGHTS.map((height) => (
+                <button
+                  key={height.value}
+                  onClick={() => onLineHeightChange(height.value)}
+                  className={cn(
+                    "w-full text-left px-3 py-2.5 rounded-md transition-colors",
+                    lineHeight === height.value 
+                      ? "bg-primary text-primary-foreground" 
+                      : "hover:bg-secondary"
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">{height.name}</span>
+                    <span className={cn(
+                      "text-xs",
+                      lineHeight === height.value ? "text-primary-foreground/70" : "text-muted-foreground"
+                    )}>
+                      {height.value}×
+                    </span>
+                  </div>
+                  <p 
+                    className={cn(
+                      "text-xs mt-1",
+                      lineHeight === height.value 
+                        ? "text-primary-foreground/80" 
+                        : "text-muted-foreground"
+                    )}
+                    style={{ lineHeight: height.value }}
+                  >
+                    {height.sample}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
     </div>
   );
 
@@ -898,6 +966,7 @@ export const RichTextEditor = ({
           fontSize,
           fontWeight,
           letterSpacing,
+          lineHeight,
           fontStyle: isItalic ? 'italic' : 'normal'
         }}
         suppressContentEditableWarning
