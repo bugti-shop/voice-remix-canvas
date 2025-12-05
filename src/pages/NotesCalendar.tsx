@@ -1,125 +1,229 @@
 import { useState, useEffect } from 'react';
-import { Note } from '@/types/note';
-import { NoteCard } from '@/components/NoteCard';
+import { NotesCalendarView } from '@/components/NotesCalendarView';
+import { Calendar as CalendarIcon, Plus, StickyNote, FileText, FileEdit, Pen, Filter, FileCode, GitBranch } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { NoteEditor } from '@/components/NoteEditor';
+import { Note, Folder, NoteType } from '@/types/note';
 import { BottomNavigation } from '@/components/BottomNavigation';
-import { Calendar } from '@/components/ui/calendar';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format, isSameDay } from 'date-fns';
+import { NoteCard } from '@/components/NoteCard';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuCheckboxItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
+import npdLogo from '@/assets/npd-logo.png';
 
 const NotesCalendar = () => {
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+  const [date, setDate] = useState<Date | undefined>(new Date());
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [selectedDateNotes, setSelectedDateNotes] = useState<Note[]>([]);
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [defaultType, setDefaultType] = useState<NoteType>('regular');
+  const [selectedNoteTypes, setSelectedNoteTypes] = useState<NoteType[]>([
+    'sticky', 'lined', 'regular', 'sketch', 'code', 'mindmap'
+  ]);
+  const [folders] = useState<Folder[]>(() => {
+    const saved = localStorage.getItem('folders');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   useEffect(() => {
     const saved = localStorage.getItem('notes');
     if (saved) {
-      const parsed = JSON.parse(saved);
-      setNotes(parsed.map((n: Note) => ({
-        ...n,
-        createdAt: new Date(n.createdAt),
-        updatedAt: new Date(n.updatedAt),
-        voiceRecordings: n.voiceRecordings?.map((r: any) => ({ ...r, timestamp: new Date(r.timestamp) })) || [],
-      })));
+      const allNotes: Note[] = JSON.parse(saved);
+      setNotes(allNotes);
     }
   }, []);
 
-  const handleSaveNote = (note: Note) => {
-    setNotes((prev) => {
-      const updated = prev.find((n) => n.id === note.id)
-        ? prev.map((n) => (n.id === note.id ? note : n))
-        : [note, ...prev];
-      localStorage.setItem('notes', JSON.stringify(updated));
-      return updated;
-    });
-  };
+  useEffect(() => {
+    if (date) {
+      const notesForDate = notes.filter(note =>
+        isSameDay(new Date(note.createdAt), date) &&
+        selectedNoteTypes.includes(note.type)
+      );
+      setSelectedDateNotes(notesForDate);
+    } else {
+      setSelectedDateNotes([]);
+    }
+  }, [date, notes, selectedNoteTypes]);
 
-  const handleDeleteNote = (id: string) => {
-    setNotes((prev) => {
-      const updated = prev.filter((n) => n.id !== id);
-      localStorage.setItem('notes', JSON.stringify(updated));
-      return updated;
-    });
+  const handleSaveNote = (noteData: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (editingNote) {
+      // Update existing note - preserve original createdAt
+      const updatedNote: Note = {
+        ...editingNote,
+        ...noteData,
+        createdAt: editingNote.createdAt, // Preserve original date
+        updatedAt: new Date(),
+      };
+      const updatedNotes = notes.map(n => n.id === editingNote.id ? updatedNote : n);
+      setNotes(updatedNotes);
+      localStorage.setItem('notes', JSON.stringify(updatedNotes));
+    } else {
+      // Create new note with selected date
+      const newNote: Note = {
+        ...noteData,
+        id: Date.now().toString(),
+        title: noteData.title || `Note - ${format(date || new Date(), 'MMM dd, yyyy')}`,
+        createdAt: date || new Date(),
+        updatedAt: date || new Date(),
+      };
+      const updatedNotes = [...notes, newNote];
+      setNotes(updatedNotes);
+      localStorage.setItem('notes', JSON.stringify(updatedNotes));
+    }
+    setIsEditorOpen(false);
+    setEditingNote(null);
+    // Trigger calendar refresh
+    window.dispatchEvent(new Event('notesUpdated'));
   };
 
   const handleEditNote = (note: Note) => {
-    setSelectedNote(note);
+    setEditingNote(note);
     setIsEditorOpen(true);
   };
 
-  const notesForSelectedDate = notes.filter((note) =>
-    isSameDay(new Date(note.createdAt), selectedDate)
-  );
+  const handleCreateNote = (type: NoteType) => {
+    setDefaultType(type);
+    setEditingNote(null);
+    setIsEditorOpen(true);
+  };
 
-  const datesWithNotes = notes.map((note) => new Date(note.createdAt));
+  const toggleNoteType = (type: NoteType) => {
+    setSelectedNoteTypes(prev =>
+      prev.includes(type)
+        ? prev.filter(t => t !== type)
+        : [...prev, type]
+    );
+  };
+
+  const NOTE_TYPE_LABELS: Record<NoteType, { label: string; icon: any }> = {
+    sticky: { label: 'Sticky', icon: StickyNote },
+    lined: { label: 'Lined', icon: FileText },
+    regular: { label: 'Regular', icon: FileEdit },
+    sketch: { label: 'Sketch', icon: Pen },
+    code: { label: 'Code', icon: FileCode },
+    mindmap: { label: 'Mind Map', icon: GitBranch },
+  };
+
+  const handleDeleteNote = (noteId: string) => {
+    const updatedNotes = notes.filter(n => n.id !== noteId);
+    setNotes(updatedNotes);
+    localStorage.setItem('notes', JSON.stringify(updatedNotes));
+    // Trigger calendar refresh
+    window.dispatchEvent(new Event('notesUpdated'));
+  };
 
   return (
-    <div className="min-h-screen bg-background pb-20 animate-fade-in">
-      <header className="border-b sticky top-0 bg-card z-10">
-        <div className="container mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold">Calendar</h1>
+    <div className="min-h-screen bg-white">
+      <header className="border-b sticky top-0 bg-white z-10">
+        <div className="container mx-auto px-4 py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <img src={npdLogo} alt="NPD" className="h-8 w-8" />
+              <h1 className="text-xl font-bold">Calendar</h1>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9">
+                  <Filter className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 z-50 bg-card">
+                <DropdownMenuLabel>Filter by Type</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {(Object.keys(NOTE_TYPE_LABELS) as NoteType[]).map((type) => {
+                  const { label, icon: Icon } = NOTE_TYPE_LABELS[type];
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={type}
+                      checked={selectedNoteTypes.includes(type)}
+                      onCheckedChange={() => toggleNoteType(type)}
+                      className="gap-2"
+                    >
+                      <Icon className="h-4 w-4" />
+                      {label}
+                    </DropdownMenuCheckboxItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-3">
-        <Card className="mb-4">
-          <CardContent className="p-4">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={(date) => date && setSelectedDate(date)}
-              modifiers={{
-                hasNotes: datesWithNotes,
-              }}
-              modifiersStyles={{
-                hasNotes: {
-                  fontWeight: 'bold',
-                  textDecoration: 'underline',
-                  textDecorationColor: 'hsl(var(--primary))',
-                },
-              }}
-              className="rounded-md w-full"
-            />
-          </CardContent>
-        </Card>
+      <main className="container mx-auto px-4 py-6 pb-32">
+        <div className="max-w-md mx-auto space-y-6">
+          <NotesCalendarView
+            selectedDate={date}
+            onDateSelect={setDate}
+          />
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">
-              Notes for {format(selectedDate, 'MMMM d, yyyy')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {notesForSelectedDate.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8">
-                No notes for this date
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {notesForSelectedDate.map((note) => (
-                  <NoteCard
-                    key={note.id}
-                    note={note}
-                    onEdit={handleEditNote}
-                    onDelete={handleDeleteNote}
-                  />
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          {selectedDateNotes.length > 0 && (
+            <div className="space-y-3 animate-fade-in">
+              <h2 className="text-lg font-semibold text-foreground">
+                Notes for {format(date || new Date(), 'MMMM dd, yyyy')}
+              </h2>
+              {selectedDateNotes.map((note) => (
+                <NoteCard
+                  key={note.id}
+                  note={note}
+                  onEdit={handleEditNote}
+                  onDelete={handleDeleteNote}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </main>
 
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            className="fixed bottom-20 left-4 right-4 z-30 h-12 text-base font-semibold"
+            size="lg"
+            disabled={!date}
+          >
+            <Plus className="h-5 w-5" />
+            Add Note
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="center" className="mb-2 w-48 z-50 bg-card">
+          <DropdownMenuItem onClick={() => handleCreateNote('sticky')} className="gap-2">
+            <StickyNote className="h-4 w-4" />
+            Sticky Note
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleCreateNote('lined')} className="gap-2">
+            <FileText className="h-4 w-4" />
+            Lined Note
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleCreateNote('regular')} className="gap-2">
+            <FileEdit className="h-4 w-4" />
+            Regular Note
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleCreateNote('sketch')} className="gap-2">
+            <Pen className="h-4 w-4" />
+            Sketch Note
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleCreateNote('code')} className="gap-2">
+            <FileCode className="h-4 w-4" />
+            Code Note
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleCreateNote('mindmap')} className="gap-2">
+            <GitBranch className="h-4 w-4" />
+            Mind Map
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
       <NoteEditor
-        note={selectedNote}
+        note={editingNote}
         isOpen={isEditorOpen}
         onClose={() => {
           setIsEditorOpen(false);
-          setSelectedNote(null);
+          setEditingNote(null);
         }}
         onSave={handleSaveNote}
+        defaultType={defaultType}
       />
 
       <BottomNavigation />
