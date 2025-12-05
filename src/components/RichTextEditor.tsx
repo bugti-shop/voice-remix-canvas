@@ -39,6 +39,10 @@ interface RichTextEditorProps {
   onFontSizeChange?: (fontSize: string) => void;
   fontWeight?: string;
   onFontWeightChange?: (fontWeight: string) => void;
+  letterSpacing?: string;
+  onLetterSpacingChange?: (letterSpacing: string) => void;
+  isItalic?: boolean;
+  onItalicChange?: (isItalic: boolean) => void;
 }
 
 const COLORS = [
@@ -129,6 +133,14 @@ const FONT_SIZES = [
   { name: 'Huge', value: '32px' },
 ];
 
+const LETTER_SPACINGS = [
+  { name: 'Tight', value: '-0.05em', sample: 'Compressed' },
+  { name: 'Normal', value: '0em', sample: 'Default spacing' },
+  { name: 'Wide', value: '0.05em', sample: 'Slightly spaced' },
+  { name: 'Wider', value: '0.1em', sample: 'More spacing' },
+  { name: 'Widest', value: '0.2em', sample: 'Maximum space' },
+];
+
 export const RichTextEditor = ({
   content,
   onChange,
@@ -145,6 +157,10 @@ export const RichTextEditor = ({
   onFontSizeChange,
   fontWeight = FONT_WEIGHTS[1].value,
   onFontWeightChange,
+  letterSpacing = LETTER_SPACINGS[1].value,
+  onLetterSpacingChange,
+  isItalic = false,
+  onItalicChange,
 }: RichTextEditorProps) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const [showLinkInput, setShowLinkInput] = useState(false);
@@ -748,6 +764,76 @@ export const RichTextEditor = ({
           </PopoverContent>
         </Popover>
       )}
+
+      {onItalicChange && (
+        <Button
+          type="button"
+          variant={isItalic ? "default" : "ghost"}
+          size="sm"
+          onClick={() => onItalicChange(!isItalic)}
+          className="h-8 px-2"
+          title="Toggle Italic Style"
+        >
+          <Italic className="h-4 w-4" />
+          <span className="text-[10px] ml-0.5">Style</span>
+        </Button>
+      )}
+
+      {onLetterSpacingChange && (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2"
+              title="Letter Spacing"
+            >
+              <span className="text-xs font-semibold tracking-widest">A⟷A</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-2">
+            <div className="p-2 border-b mb-2">
+              <h4 className="font-semibold text-sm">Letter Spacing</h4>
+            </div>
+            <div className="flex flex-col gap-1">
+              {LETTER_SPACINGS.map((spacing) => (
+                <button
+                  key={spacing.value}
+                  onClick={() => onLetterSpacingChange(spacing.value)}
+                  className={cn(
+                    "w-full text-left px-3 py-2.5 rounded-md transition-colors",
+                    letterSpacing === spacing.value 
+                      ? "bg-primary text-primary-foreground" 
+                      : "hover:bg-secondary"
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">{spacing.name}</span>
+                    <span className={cn(
+                      "text-xs",
+                      letterSpacing === spacing.value ? "text-primary-foreground/70" : "text-muted-foreground"
+                    )}>
+                      {spacing.value}
+                    </span>
+                  </div>
+                  <p 
+                    className={cn(
+                      "text-xs mt-1",
+                      letterSpacing === spacing.value 
+                        ? "text-primary-foreground/80" 
+                        : "text-muted-foreground"
+                    )}
+                    style={{ letterSpacing: spacing.value }}
+                  >
+                    {spacing.sample}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
     </div>
   );
 
@@ -810,7 +896,9 @@ export const RichTextEditor = ({
           paddingBottom: 'calc(8rem + var(--keyboard-inset, 0px))',
           fontFamily,
           fontSize,
-          fontWeight
+          fontWeight,
+          letterSpacing,
+          fontStyle: isItalic ? 'italic' : 'normal'
         }}
         suppressContentEditableWarning
       />
