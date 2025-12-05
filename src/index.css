@@ -79,17 +79,20 @@
   }
 
   .lined-note {
-    --line-gap: 1.5em;
+    --line-gap: 2em;
     background-color: white !important;
     background-image: repeating-linear-gradient(
+      to bottom,
       transparent,
       transparent calc(var(--line-gap) - 1px),
-      hsl(var(--muted-foreground) / 0.3) calc(var(--line-gap) - 1px),
-      hsl(var(--muted-foreground) / 0.3) var(--line-gap)
+      hsl(var(--muted-foreground) / 0.25) calc(var(--line-gap) - 1px),
+      hsl(var(--muted-foreground) / 0.25) var(--line-gap)
     );
     background-size: 100% var(--line-gap);
     background-attachment: local;
+    background-position: 0 0.85em;
     line-height: var(--line-gap) !important;
+    padding-top: 0.15em !important;
   }
 
   .dark .lined-note {
