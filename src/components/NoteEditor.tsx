@@ -69,6 +69,7 @@ export const NoteEditor = ({ note, isOpen, onClose, onSave, defaultType = 'regul
   const [fontWeight, setFontWeight] = useState<string>('400');
   const [letterSpacing, setLetterSpacing] = useState<string>('0em');
   const [isItalic, setIsItalic] = useState<boolean>(false);
+  const [lineHeight, setLineHeight] = useState<string>('1.5');
   const [createdAt, setCreatedAt] = useState<Date>(new Date());
   const [createdTime, setCreatedTime] = useState<string>('12:00');
   const [reminderEnabled, setReminderEnabled] = useState(false);
@@ -113,6 +114,7 @@ export const NoteEditor = ({ note, isOpen, onClose, onSave, defaultType = 'regul
       setFontWeight(note.fontWeight || '400');
       setLetterSpacing(note.letterSpacing || '0em');
       setIsItalic(note.isItalic || false);
+      setLineHeight(note.lineHeight || '1.5');
       const noteDate = new Date(note.createdAt);
       setCreatedAt(noteDate);
       setCreatedTime(format(noteDate, 'HH:mm'));
@@ -142,6 +144,7 @@ export const NoteEditor = ({ note, isOpen, onClose, onSave, defaultType = 'regul
       setFontWeight('400');
       setLetterSpacing('0em');
       setIsItalic(false);
+      setLineHeight('1.5');
       const now = new Date();
       setCreatedAt(now);
       setCreatedTime(format(now, 'HH:mm'));
@@ -205,6 +208,7 @@ export const NoteEditor = ({ note, isOpen, onClose, onSave, defaultType = 'regul
       fontWeight: (noteType === 'sticky' || noteType === 'lined' || noteType === 'regular') ? fontWeight : undefined,
       letterSpacing: (noteType === 'sticky' || noteType === 'lined' || noteType === 'regular') ? letterSpacing : undefined,
       isItalic: (noteType === 'sticky' || noteType === 'lined' || noteType === 'regular') ? isItalic : undefined,
+      lineHeight: (noteType === 'sticky' || noteType === 'lined' || noteType === 'regular') ? lineHeight : undefined,
       codeContent: noteType === 'code' ? codeContent : undefined,
       codeLanguage: noteType === 'code' ? codeLanguage : undefined,
       reminderEnabled,
@@ -469,6 +473,8 @@ export const NoteEditor = ({ note, isOpen, onClose, onSave, defaultType = 'regul
             onLetterSpacingChange={setLetterSpacing}
             isItalic={isItalic}
             onItalicChange={setIsItalic}
+            lineHeight={lineHeight}
+            onLineHeightChange={setLineHeight}
           />
         )}
       </div>

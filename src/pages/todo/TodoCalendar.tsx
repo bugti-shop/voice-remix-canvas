@@ -10,6 +10,8 @@ import { TaskDetailSheet } from '@/components/TaskDetailSheet';
 import { isSameDay } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { TodoLayout } from './TodoLayout';
+import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent, isGoogleCalendarEnabled } from '@/utils/googleCalendar';
+import { toast } from 'sonner';
 
 const TodoCalendar = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -53,6 +55,16 @@ const TodoCalendar = () => {
 
   const handleAddTask = async (task: Omit<TodoItem, 'id' | 'completed'>) => {
     const newItem: TodoItem = { id: Date.now().toString(), completed: false, ...task };
+    
+    // Sync to Google Calendar if enabled
+    if (await isGoogleCalendarEnabled() && newItem.dueDate) {
+      const eventId = await createCalendarEvent(newItem);
+      if (eventId) {
+        newItem.googleCalendarEventId = eventId;
+        toast.success('Task synced to Google Calendar');
+      }
+    }
+    
     const updatedItems = [...items, newItem];
     setItems(updatedItems);
     const saved = localStorage.getItem('todoItems');
@@ -70,13 +82,38 @@ const TodoCalendar = () => {
   };
 
   const handleUpdateTask = async (itemId: string, updates: Partial<TodoItem>) => {
-    const updatedItems = items.map(task => task.id === itemId ? { ...task, ...updates } : task);
+    const updatedItems = items.map(task => {
+      if (task.id === itemId) {
+        const updatedTask = { ...task, ...updates };
+        
+        // Sync to Google Calendar if enabled
+        if (updatedTask.googleCalendarEventId && updatedTask.dueDate) {
+          isGoogleCalendarEnabled().then(enabled => {
+            if (enabled) {
+              updateCalendarEvent(updatedTask.googleCalendarEventId!, updatedTask);
+            }
+          });
+        }
+        
+        return updatedTask;
+      }
+      return task;
+    });
     setItems(updatedItems);
     localStorage.setItem('todoItems', JSON.stringify(updatedItems));
     window.dispatchEvent(new Event('tasksUpdated'));
   };
 
   const handleDeleteTask = async (itemId: string) => {
+    // Find task and sync deletion to Google Calendar
+    const taskToDelete = items.find(t => t.id === itemId);
+    if (taskToDelete?.googleCalendarEventId) {
+      const enabled = await isGoogleCalendarEnabled();
+      if (enabled) {
+        await deleteCalendarEvent(taskToDelete.googleCalendarEventId);
+      }
+    }
+    
     const updatedItems = items.filter(task => task.id !== itemId);
     setItems(updatedItems);
     localStorage.setItem('todoItems', JSON.stringify(updatedItems));
