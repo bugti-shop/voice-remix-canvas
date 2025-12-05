@@ -22,7 +22,7 @@ export const TodoLayout = ({ children, title }: TodoLayoutProps) => {
 
   return (
     <div className="min-h-screen bg-background animate-fade-in">
-      <header className="border-b sticky top-0 bg-card z-10">
+      <header className="border-b sticky top-0 bg-background z-10">
         <div className="container mx-auto px-4 py-2">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
