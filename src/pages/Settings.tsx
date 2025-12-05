@@ -134,8 +134,8 @@ const Settings = () => {
       <header className="border-b sticky top-0 bg-white dark:bg-card z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-2">
-            <img src={appLogo} alt="Notes" className="h-8 w-8 rounded-lg" />
-            <h1 className="text-xl font-bold">Settings</h1>
+            <img src={appLogo} alt="Npd" className="h-8 w-8" />
+            <h1 className="text-xl font-bold">Npd</h1>
           </div>
         </div>
       </header>
