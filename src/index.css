@@ -78,26 +78,40 @@
     min-height: 200px;
   }
 
-  .lined-note {
-    --line-gap: 2em;
-    background-color: white !important;
-    background-image: repeating-linear-gradient(
-      to bottom,
-      transparent,
-      transparent calc(var(--line-gap) - 1px),
-      hsl(var(--muted-foreground) / 0.25) calc(var(--line-gap) - 1px),
-      hsl(var(--muted-foreground) / 0.25) var(--line-gap)
-    );
-    background-size: 100% var(--line-gap);
-    background-attachment: local;
-    background-position: 0 0.85em;
-    line-height: var(--line-gap) !important;
-    padding-top: 0.15em !important;
-  }
+.lined-note {
+  /* Lined paper: darker, aligned, and scrolls with content */
+  --line-gap: 1.75rem; /* distance between lines */
+  --first-line-offset: 1.25rem; /* push first text row to sit on first line */
+  background-color: white !important;
+  background-image: linear-gradient(
+    transparent,
+    transparent calc(var(--line-gap) - 1px),
+    hsl(var(--muted-foreground) / 0.7) calc(var(--line-gap) - 1px),
+    hsl(var(--muted-foreground) / 0.7) var(--line-gap)
+  );
+  background-size: 100% var(--line-gap);
+  background-position: 0 calc(var(--first-line-offset) - 1px);
+  background-origin: padding-box; /* align pattern relative to padding */
+  background-attachment: local; /* lines move with text while scrolling */
+  line-height: var(--line-gap);
+  padding-top: var(--first-line-offset);
+}
 
-  .dark .lined-note {
-    background-color: hsl(var(--background)) !important;
-  }
+.dark .lined-note {
+  background-color: #1a1a1a !important;
+  background-image: linear-gradient(
+    transparent,
+    transparent calc(var(--line-gap) - 1px),
+    hsl(var(--muted-foreground) / 0.7) calc(var(--line-gap) - 1px),
+    hsl(var(--muted-foreground) / 0.7) var(--line-gap)
+  );
+  background-attachment: local;
+}
+
+/* Ensure the editable area aligns perfectly with the first line */
+.rich-text-editor.lined-note {
+  padding-top: var(--first-line-offset) !important;
+}
 }
 
 @layer base {
