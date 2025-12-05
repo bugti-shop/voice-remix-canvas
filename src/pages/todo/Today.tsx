@@ -45,7 +45,7 @@ const Today = () => {
   const [isBatchTaskOpen, setIsBatchTaskOpen] = useState(false);
   const [groupBy, setGroupBy] = useState<GroupBy>('custom');
   const [sortBy, setSortBy] = useState<SortBy>('custom');
-  const [viewMode, setViewMode] = useState<ViewMode>('card');
+  const [viewMode, setViewMode] = useState<ViewMode>('flat');
 
   useEffect(() => {
     const saved = localStorage.getItem('todoItems');
@@ -313,9 +313,11 @@ const Today = () => {
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold flex items-center gap-2"><FolderIcon className="h-5 w-5" />Folders</h2>
               <div className="flex items-center gap-2">
-                <Button variant={isSelectionMode ? "default" : "outline"} size="sm" onClick={() => { setIsSelectionMode(!isSelectionMode); if (isSelectionMode) setSelectedTaskIds(new Set()); }}>
-                  {isSelectionMode ? 'Cancel' : 'Select'}
-                </Button>
+                {isSelectionMode && (
+                  <Button variant="default" size="sm" onClick={() => { setIsSelectionMode(false); setSelectedTaskIds(new Set()); }}>
+                    Cancel
+                  </Button>
+                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-9 w-9">
