@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { TodoItem, Folder, Priority } from '@/types/note';
 import { Input } from '@/components/ui/input';
-import { Plus, FolderIcon, Edit2, X, CheckSquare, Trash2, FolderInput, Flag, Filter, ChevronRight, ChevronDown } from 'lucide-react';
+import { Plus, FolderIcon, Edit2, X, CheckSquare, Trash2, FolderInput, Flag, Filter, ChevronRight, ChevronDown, MoreVertical, Eye, EyeOff, ArrowUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { TaskInputSheet } from '@/components/TaskInputSheet';
 import { TaskDetailSheet } from '@/components/TaskDetailSheet';
 import { TaskItem } from '@/components/TaskItem';
+import { TaskOptionsSheet, GroupBy, SortBy } from '@/components/TaskOptionsSheet';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { notificationManager } from '@/utils/notifications';
 import {
@@ -36,6 +37,13 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { TodoLayout } from './TodoLayout';
 
 const Today = () => {
@@ -54,6 +62,10 @@ const Today = () => {
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [folderClickCounts, setFolderClickCounts] = useState<Record<string, number>>({});
   const [isCompletedOpen, setIsCompletedOpen] = useState(false);
+  const [showCompleted, setShowCompleted] = useState(true);
+  const [isOptionsSheetOpen, setIsOptionsSheetOpen] = useState(false);
+  const [groupBy, setGroupBy] = useState<GroupBy>('custom');
+  const [sortBy, setSortBy] = useState<SortBy>('custom');
 
   useEffect(() => {
     const saved = localStorage.getItem('todoItems');
@@ -76,6 +88,14 @@ const Today = () => {
         createdAt: new Date(f.createdAt)
       })));
     }
+
+    // Load saved preferences
+    const savedShowCompleted = localStorage.getItem('todoShowCompleted');
+    if (savedShowCompleted !== null) setShowCompleted(JSON.parse(savedShowCompleted));
+    const savedGroupBy = localStorage.getItem('todoGroupBy');
+    if (savedGroupBy) setGroupBy(savedGroupBy as GroupBy);
+    const savedSortBy = localStorage.getItem('todoSortBy');
+    if (savedSortBy) setSortBy(savedSortBy as SortBy);
   }, []);
 
   useEffect(() => {
@@ -85,6 +105,15 @@ const Today = () => {
   useEffect(() => {
     localStorage.setItem('todoFolders', JSON.stringify(folders));
   }, [folders]);
+
+  useEffect(() => {
+    localStorage.setItem('todoShowCompleted', JSON.stringify(showCompleted));
+  }, [showCompleted]);
+
+  useEffect(() => {
+    localStorage.setItem('todoGroupBy', groupBy);
+    localStorage.setItem('todoSortBy', sortBy);
+  }, [groupBy, sortBy]);
 
   const handleCreateFolder = (name: string, color: string) => {
     const newFolder: Folder = {
@@ -156,14 +185,53 @@ const Today = () => {
     setIsSelectionMode(false);
   };
 
-  const filteredItems = items.filter(item => {
-    const folderMatch = selectedFolderId ? item.folderId === selectedFolderId : true;
-    const priorityMatch = selectedPriority === 'all' ? true : item.priority === selectedPriority;
-    return folderMatch && priorityMatch;
-  });
+  // Filter and sort items
+  const processedItems = useMemo(() => {
+    let filtered = items.filter(item => {
+      const folderMatch = selectedFolderId ? item.folderId === selectedFolderId : true;
+      const priorityMatch = selectedPriority === 'all' ? true : item.priority === selectedPriority;
+      return folderMatch && priorityMatch;
+    });
 
-  const uncompletedItems = filteredItems.filter(item => !item.completed);
-  const completedItems = filteredItems.filter(item => item.completed);
+    // Sort items
+    if (sortBy === 'date') {
+      filtered = [...filtered].sort((a, b) => {
+        const dateA = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+        const dateB = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+        return dateA - dateB;
+      });
+    } else if (sortBy === 'priority') {
+      const priorityOrder: Record<Priority | 'none', number> = { high: 0, medium: 1, low: 2, none: 3 };
+      filtered = [...filtered].sort((a, b) => {
+        return (priorityOrder[a.priority || 'none'] || 3) - (priorityOrder[b.priority || 'none'] || 3);
+      });
+    }
+
+    return filtered;
+  }, [items, selectedFolderId, selectedPriority, sortBy]);
+
+  const uncompletedItems = processedItems.filter(item => !item.completed);
+  const completedItems = processedItems.filter(item => item.completed);
+
+  // Group items by groupBy setting
+  const groupedItems = useMemo(() => {
+    if (groupBy === 'custom') return null;
+
+    const groups: Record<string, TodoItem[]> = {};
+    
+    uncompletedItems.forEach(item => {
+      let key = 'No Group';
+      if (groupBy === 'date') {
+        key = item.dueDate ? new Date(item.dueDate).toLocaleDateString() : 'No Date';
+      } else if (groupBy === 'priority') {
+        key = item.priority ? item.priority.charAt(0).toUpperCase() + item.priority.slice(1) : 'No Priority';
+      }
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(item);
+    });
+
+    return groups;
+  }, [uncompletedItems, groupBy]);
 
   return (
     <TodoLayout title="Today">
@@ -173,9 +241,28 @@ const Today = () => {
           <div className="mb-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold flex items-center gap-2"><FolderIcon className="h-5 w-5" />Folders</h2>
-              <Button variant={isSelectionMode ? "default" : "outline"} size="sm" onClick={() => { setIsSelectionMode(!isSelectionMode); if (isSelectionMode) setSelectedTaskIds(new Set()); }}>
-                {isSelectionMode ? 'Cancel' : 'Select'}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant={isSelectionMode ? "default" : "outline"} size="sm" onClick={() => { setIsSelectionMode(!isSelectionMode); if (isSelectionMode) setSelectedTaskIds(new Set()); }}>
+                  {isSelectionMode ? 'Cancel' : 'Select'}
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-9 w-9">
+                      <MoreVertical className="h-5 w-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48 bg-popover border shadow-lg z-50">
+                    <DropdownMenuItem onClick={() => setShowCompleted(!showCompleted)} className="cursor-pointer">
+                      {showCompleted ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+                      {showCompleted ? 'Hide Completed' : 'Show Completed'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setIsOptionsSheetOpen(true)} className="cursor-pointer">
+                      <ArrowUpDown className="h-4 w-4 mr-2" />
+                      Group & Sort
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
             <div className="flex gap-2 overflow-x-auto pb-2">
               <button onClick={() => setSelectedFolderId(null)} className={cn("flex items-center gap-2 px-4 py-2 rounded-full border-2 transition-all whitespace-nowrap", !selectedFolderId ? "bg-primary text-primary-foreground border-primary" : "bg-card hover:bg-muted border-border")}>
@@ -198,18 +285,30 @@ const Today = () => {
           )}
 
           {/* Tasks */}
-          {filteredItems.length === 0 ? (
+          {processedItems.length === 0 ? (
             <div className="text-center py-20"><p className="text-muted-foreground">No tasks yet. Tap "Add Task" to get started!</p></div>
           ) : (
             <div className="space-y-4">
-              {uncompletedItems.length > 0 && (
+              {/* Grouped or ungrouped uncompleted items */}
+              {groupBy !== 'custom' && groupedItems ? (
+                Object.entries(groupedItems).map(([groupName, groupTasks]) => (
+                  <div key={groupName} className="space-y-2">
+                    <h3 className="text-sm font-semibold text-muted-foreground px-2">{groupName}</h3>
+                    {groupTasks.map((item) => (
+                      <TaskItem key={item.id} item={item} onUpdate={updateItem} onDelete={deleteItem} onTaskClick={setSelectedTask} onImageClick={setSelectedImage} isSelected={selectedTaskIds.has(item.id)} isSelectionMode={isSelectionMode} onSelect={handleSelectTask} />
+                    ))}
+                  </div>
+                ))
+              ) : uncompletedItems.length > 0 && (
                 <div className="space-y-2">
                   {uncompletedItems.map((item) => (
                     <TaskItem key={item.id} item={item} onUpdate={updateItem} onDelete={deleteItem} onTaskClick={setSelectedTask} onImageClick={setSelectedImage} isSelected={selectedTaskIds.has(item.id)} isSelectionMode={isSelectionMode} onSelect={handleSelectTask} />
                   ))}
                 </div>
               )}
-              {completedItems.length > 0 && (
+
+              {/* Completed items */}
+              {showCompleted && completedItems.length > 0 && (
                 <Collapsible open={isCompletedOpen} onOpenChange={setIsCompletedOpen}>
                   <div className="bg-muted/50 rounded-xl p-3 border border-border/30">
                     <CollapsibleTrigger asChild>
@@ -237,6 +336,7 @@ const Today = () => {
 
       <TaskInputSheet isOpen={isInputOpen} onClose={() => setIsInputOpen(false)} onAddTask={handleAddTask} folders={folders} selectedFolderId={selectedFolderId} onCreateFolder={handleCreateFolder} />
       <TaskDetailSheet isOpen={!!selectedTask} task={selectedTask} onClose={() => setSelectedTask(null)} onUpdate={(updatedTask) => { updateItem(updatedTask.id, updatedTask); setSelectedTask(updatedTask); }} onDelete={deleteItem} onDuplicate={duplicateTask} />
+      <TaskOptionsSheet isOpen={isOptionsSheetOpen} onClose={() => setIsOptionsSheetOpen(false)} groupBy={groupBy} sortBy={sortBy} onGroupByChange={setGroupBy} onSortByChange={setSortBy} />
 
       <Dialog open={!!selectedImage} onOpenChange={(open) => !open && setSelectedImage(null)}>
         <DialogContent className="max-w-3xl"><DialogHeader><DialogTitle>Task Image</DialogTitle></DialogHeader>
