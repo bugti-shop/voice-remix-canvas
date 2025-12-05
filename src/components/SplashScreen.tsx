@@ -26,9 +26,9 @@ export const SplashScreen = ({ onComplete }: SplashScreenProps) => {
     <div className="fixed inset-0 bg-background z-50 flex flex-col items-center justify-center px-6">
       <div className="animate-scale-in mb-12">
         <img
-          src="/src/assets/npd-logo.png"
-          alt="NPD Logo"
-          className="w-32 h-32 object-contain"
+          src="/src/assets/app-logo.png"
+          alt="Notes Logo"
+          className="w-32 h-32 object-contain rounded-2xl"
         />
       </div>
 

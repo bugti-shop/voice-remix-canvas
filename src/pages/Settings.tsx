@@ -2,7 +2,7 @@ import { BottomNavigation } from '@/components/BottomNavigation';
 import { ChevronRight, Settings as SettingsIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
-import npdLogo from '@/assets/npd-logo.png';
+import appLogo from '@/assets/app-logo.png';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -134,7 +134,7 @@ const Settings = () => {
       <header className="border-b sticky top-0 bg-white dark:bg-card z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-2">
-            <img src={npdLogo} alt="NPD" className="h-8 w-8" />
+            <img src={appLogo} alt="Notes" className="h-8 w-8 rounded-lg" />
             <h1 className="text-xl font-bold">Settings</h1>
           </div>
         </div>

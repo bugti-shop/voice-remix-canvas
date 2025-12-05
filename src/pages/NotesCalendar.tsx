@@ -9,7 +9,7 @@ import { format, isSameDay } from 'date-fns';
 import { NoteCard } from '@/components/NoteCard';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuCheckboxItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import npdLogo from '@/assets/npd-logo.png';
+import appLogo from '@/assets/app-logo.png';
 
 const NotesCalendar = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -119,7 +119,7 @@ const NotesCalendar = () => {
         <div className="container mx-auto px-4 py-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <img src={npdLogo} alt="NPD" className="h-8 w-8" />
+              <img src={appLogo} alt="Notes" className="h-8 w-8 rounded-lg" />
               <h1 className="text-xl font-bold">Calendar</h1>
             </div>
             <DropdownMenu>
