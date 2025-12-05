@@ -160,7 +160,7 @@ const Reminders = () => {
       <header className="border-b sticky top-0 bg-card z-10">
         <div className="container mx-auto px-4 py-2">
           <div className="flex items-center gap-2">
-            <img src="/src/assets/npd-logo.png" alt="NPD" className="h-8 w-8" />
+            <img src="/src/assets/app-logo.png" alt="Notes" className="h-8 w-8 rounded-lg" />
             <h1 className="text-xl font-bold">Reminders</h1>
           </div>
         </div>

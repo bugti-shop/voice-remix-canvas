@@ -8,7 +8,7 @@ import { SyncBadge } from '@/components/SyncStatusIndicator';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import { syncManager } from '@/utils/syncManager';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
-import npdLogo from '@/assets/npd-logo.png';
+import appLogo from '@/assets/app-logo.png';
 
 interface TodoLayoutProps {
   children: ReactNode;
@@ -26,7 +26,7 @@ export const TodoLayout = ({ children, title }: TodoLayoutProps) => {
         <div className="container mx-auto px-4 py-2">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <img src={npdLogo} alt="NPD" className="h-8 w-8" />
+              <img src={appLogo} alt="Notes" className="h-8 w-8 rounded-lg" />
               <h1 className="text-xl font-bold">{title}</h1>
             </div>
             <div className="flex items-center gap-2">
