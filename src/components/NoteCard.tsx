@@ -2,7 +2,7 @@ import { Note } from '@/types/note';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Trash2, Edit, Mic, FileText, Pen, Pin, FileCode, GitBranch } from 'lucide-react';
+import { Trash2, Edit, Mic, FileText, Pen, Pin, FileCode, GitBranch, AlignLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NoteCardProps {
@@ -39,6 +39,10 @@ const RANDOM_COLORS = [
 
 export const NoteCard = ({ note, onEdit, onDelete, onTogglePin, onDragStart, onDragOver, onDrop, onDragEnd }: NoteCardProps) => {
   const isSticky = note.type === 'sticky';
+  const isLined = note.type === 'lined';
+  const isSketch = note.type === 'sketch';
+  const isMindMap = note.type === 'mindmap';
+  const isCode = note.type === 'code';
 
   const getCardColor = () => {
     if (isSticky && note.color) {
@@ -55,6 +59,8 @@ export const NoteCard = ({ note, onEdit, onDelete, onTogglePin, onDragStart, onD
       return { icon: Mic, label: 'Audio File' };
     }
     switch (note.type) {
+      case 'lined':
+        return { icon: AlignLeft, label: 'Lined' };
       case 'sketch':
         return { icon: Pen, label: 'Sketch' };
       case 'code':
