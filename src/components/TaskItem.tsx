@@ -159,7 +159,7 @@ export const TaskItem = ({
                 onClick={(e) => { e.stopPropagation(); if (!isSelectionMode && !isSwiping) onTaskClick(item); }}
               >
                 <div className="flex items-center gap-2">
-                  <p className={cn("text-sm font-medium truncate", item.completed && "line-through text-muted-foreground")}>{item.text}</p>
+                  <p className={cn("text-sm font-medium truncate", item.completed && "text-muted-foreground")}>{item.text}</p>
                   {item.repeatType && item.repeatType !== 'none' && <Repeat className="h-3 w-3 text-purple-500 flex-shrink-0" />}
                 </div>
                 {hasSubtasks && <p className="text-xs text-muted-foreground mt-1">{item.subtasks!.filter(st => st.completed).length}/{item.subtasks!.length} subtasks</p>}
