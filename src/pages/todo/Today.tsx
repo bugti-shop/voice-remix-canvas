@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
 import { TodoItem, Folder, Priority } from '@/types/note';
+import { Input } from '@/components/ui/input';
 import { Plus, FolderIcon, Edit2, X, CheckSquare, Trash2, FolderInput, Flag, Filter, ChevronRight, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { TaskInputSheet } from '@/components/TaskInputSheet';
+import { TaskDetailSheet } from '@/components/TaskDetailSheet';
 import { TaskItem } from '@/components/TaskItem';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { notificationManager } from '@/utils/notifications';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,6 +19,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import {
   Popover,
@@ -28,264 +38,209 @@ import {
 } from "@/components/ui/collapsible";
 import { TodoLayout } from './TodoLayout';
 
-const STORAGE_KEY = 'nota-todo-items';
-const FOLDERS_KEY = 'nota-folders';
-
 const Today = () => {
   const [items, setItems] = useState<TodoItem[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedPriority, setSelectedPriority] = useState<Priority | 'all'>('all');
+  const [isInputOpen, setIsInputOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<TodoItem | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [folderToDelete, setFolderToDelete] = useState<Folder | null>(null);
+  const [folderToEdit, setFolderToEdit] = useState<Folder | null>(null);
+  const [editFolderName, setEditFolderName] = useState('');
+  const [editFolderColor, setEditFolderColor] = useState('');
   const [isSelectionMode, setIsSelectionMode] = useState(false);
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
-  const [imageViewerUrl, setImageViewerUrl] = useState<string | null>(null);
-  const [completedOpen, setCompletedOpen] = useState(true);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
+  const [folderClickCounts, setFolderClickCounts] = useState<Record<string, number>>({});
+  const [isCompletedOpen, setIsCompletedOpen] = useState(false);
 
   useEffect(() => {
-    loadItems();
-    loadFolders();
+    const saved = localStorage.getItem('todoItems');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      const loadedItems = parsed.map((item: TodoItem) => ({
+        ...item,
+        dueDate: item.dueDate ? new Date(item.dueDate) : undefined,
+        reminderTime: item.reminderTime ? new Date(item.reminderTime) : undefined,
+      }));
+      setItems(loadedItems);
+      notificationManager.rescheduleAllTasks(loadedItems).catch(console.error);
+    }
+
+    const savedFolders = localStorage.getItem('todoFolders');
+    if (savedFolders) {
+      const parsed = JSON.parse(savedFolders);
+      setFolders(parsed.map((f: Folder) => ({
+        ...f,
+        createdAt: new Date(f.createdAt)
+      })));
+    }
   }, []);
 
-  const loadItems = () => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      setItems(JSON.parse(saved));
-    }
-  };
+  useEffect(() => {
+    localStorage.setItem('todoItems', JSON.stringify(items));
+  }, [items]);
 
-  const loadFolders = () => {
-    const saved = localStorage.getItem(FOLDERS_KEY);
-    if (saved) {
-      setFolders(JSON.parse(saved));
-    }
-  };
+  useEffect(() => {
+    localStorage.setItem('todoFolders', JSON.stringify(folders));
+  }, [folders]);
 
-  const saveItems = (newItems: TodoItem[]) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newItems));
-    setItems(newItems);
-  };
-
-  const updateItem = (itemId: string, updates: Partial<TodoItem>) => {
-    const updateItemInList = (items: TodoItem[]): TodoItem[] => {
-      return items.map(item => {
-        if (item.id === itemId) {
-          return { ...item, ...updates };
-        }
-        if (item.subtasks && item.subtasks.length > 0) {
-          return { ...item, subtasks: updateItemInList(item.subtasks) };
-        }
-        return item;
-      });
+  const handleCreateFolder = (name: string, color: string) => {
+    const newFolder: Folder = {
+      id: Date.now().toString(),
+      name,
+      color,
+      isDefault: false,
+      createdAt: new Date(),
     };
-    saveItems(updateItemInList(items));
+    setFolders([...folders, newFolder]);
   };
 
-  const deleteItem = (itemId: string) => {
-    const deleteItemFromList = (items: TodoItem[]): TodoItem[] => {
-      return items
-        .filter(item => item.id !== itemId)
-        .map(item => ({
-          ...item,
-          subtasks: item.subtasks ? deleteItemFromList(item.subtasks) : undefined
-        }));
-    };
-    saveItems(deleteItemFromList(items));
+  const handleEditFolder = () => {
+    if (!folderToEdit || !editFolderName.trim()) return;
+    const updatedFolders = folders.map(f =>
+      f.id === folderToEdit.id ? { ...f, name: editFolderName, color: editFolderColor } : f
+    );
+    setFolders(updatedFolders);
+    setFolderToEdit(null);
+  };
+
+  const handleDeleteFolder = () => {
+    if (!folderToDelete) return;
+    const updatedItems = items.map(item =>
+      item.folderId === folderToDelete.id ? { ...item, folderId: undefined } : item
+    );
+    setItems(updatedItems);
+    setFolders(folders.filter(f => f.id !== folderToDelete.id));
+    if (selectedFolderId === folderToDelete.id) setSelectedFolderId(null);
+    setFolderToDelete(null);
+  };
+
+  const handleAddTask = async (task: Omit<TodoItem, 'id' | 'completed'>) => {
+    const newItem: TodoItem = { id: Date.now().toString(), completed: false, ...task };
+    if (newItem.reminderTime) {
+      try { await notificationManager.scheduleTaskReminder(newItem); } catch (error) { console.error('Failed to schedule notification:', error); }
+    }
+    setItems([newItem, ...items]);
+  };
+
+  const updateItem = async (itemId: string, updates: Partial<TodoItem>) => {
+    const updatedItems = items.map((i) => (i.id === itemId ? { ...i, ...updates } : i));
+    setItems(updatedItems);
+  };
+
+  const deleteItem = async (itemId: string) => {
+    try { await Haptics.impact({ style: ImpactStyle.Medium }); } catch {}
+    setItems(items.filter((item) => item.id !== itemId));
+  };
+
+  const duplicateTask = async (task: TodoItem) => {
+    try { await Haptics.impact({ style: ImpactStyle.Light }); } catch {}
+    const duplicatedTask: TodoItem = { ...task, id: Date.now().toString(), completed: false, text: `${task.text} (Copy)` };
+    setItems([duplicatedTask, ...items]);
+  };
+
+  const handleSelectTask = (taskId: string) => {
+    setSelectedTaskIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(taskId)) newSet.delete(taskId);
+      else newSet.add(taskId);
+      return newSet;
+    });
   };
 
   const handleBulkDelete = async () => {
-    try {
-      await Haptics.impact({ style: ImpactStyle.Heavy });
-    } catch {}
-    
-    const newItems = items.filter(item => !selectedItems.has(item.id));
-    saveItems(newItems);
-    setSelectedItems(new Set());
+    setItems(items.filter(item => !selectedTaskIds.has(item.id)));
+    setSelectedTaskIds(new Set());
     setIsSelectionMode(false);
   };
 
   const filteredItems = items.filter(item => {
-    if (selectedFolderId && item.folderId !== selectedFolderId) return false;
-    if (selectedPriority !== 'all' && item.priority !== selectedPriority) return false;
-    return true;
+    const folderMatch = selectedFolderId ? item.folderId === selectedFolderId : true;
+    const priorityMatch = selectedPriority === 'all' ? true : item.priority === selectedPriority;
+    return folderMatch && priorityMatch;
   });
 
-  const pendingItems = filteredItems.filter(item => !item.completed);
+  const uncompletedItems = filteredItems.filter(item => !item.completed);
   const completedItems = filteredItems.filter(item => item.completed);
 
   return (
     <TodoLayout title="Today">
-      <main className="container mx-auto px-4 py-6 pb-24">
-        {/* Filters */}
-        <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <FolderIcon className="h-4 w-4" />
-                {selectedFolderId ? folders.find(f => f.id === selectedFolderId)?.name : 'All Folders'}
+      <main className="container mx-auto px-4 py-3 pb-32">
+        <div className="max-w-2xl mx-auto">
+          {/* Folders */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold flex items-center gap-2"><FolderIcon className="h-5 w-5" />Folders</h2>
+              <Button variant={isSelectionMode ? "default" : "outline"} size="sm" onClick={() => { setIsSelectionMode(!isSelectionMode); if (isSelectionMode) setSelectedTaskIds(new Set()); }}>
+                {isSelectionMode ? 'Cancel' : 'Select'}
               </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-48">
-              <div className="space-y-1">
-                <Button
-                  variant={selectedFolderId === null ? "secondary" : "ghost"}
-                  size="sm"
-                  className="w-full justify-start"
-                  onClick={() => setSelectedFolderId(null)}
-                >
-                  All Folders
-                </Button>
-                {folders.map(folder => (
-                  <Button
-                    key={folder.id}
-                    variant={selectedFolderId === folder.id ? "secondary" : "ghost"}
-                    size="sm"
-                    className="w-full justify-start"
-                    onClick={() => setSelectedFolderId(folder.id)}
-                  >
-                    {folder.name}
-                  </Button>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Flag className="h-4 w-4" />
-                {selectedPriority === 'all' ? 'All Priorities' : selectedPriority}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-48">
-              <div className="space-y-1">
-                {['all', 'high', 'medium', 'low', 'none'].map(p => (
-                  <Button
-                    key={p}
-                    variant={selectedPriority === p ? "secondary" : "ghost"}
-                    size="sm"
-                    className="w-full justify-start capitalize"
-                    onClick={() => setSelectedPriority(p as Priority | 'all')}
-                  >
-                    {p === 'all' ? 'All Priorities' : p}
-                  </Button>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          {isSelectionMode && selectedItems.size > 0 && (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => setDeleteDialogOpen(true)}
-              className="ml-auto"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete ({selectedItems.size})
-            </Button>
-          )}
-        </div>
-
-        {/* Pending Tasks */}
-        <div className="space-y-2 mb-6">
-          {pendingItems.length === 0 ? (
-            <div className="text-center py-12">
-              <CheckSquare className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-              <h2 className="text-xl font-semibold mb-2">No Tasks</h2>
-              <p className="text-muted-foreground">Add a task to get started</p>
             </div>
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              <button onClick={() => setSelectedFolderId(null)} className={cn("flex items-center gap-2 px-4 py-2 rounded-full border-2 transition-all whitespace-nowrap", !selectedFolderId ? "bg-primary text-primary-foreground border-primary" : "bg-card hover:bg-muted border-border")}>
+                <FolderIcon className="h-4 w-4" />All Tasks
+              </button>
+              {folders.map((folder) => (
+                <button key={folder.id} onClick={() => setSelectedFolderId(folder.id)} className="flex items-center gap-2 px-4 py-2 rounded-full border-2 transition-all whitespace-nowrap" style={{ backgroundColor: selectedFolderId === folder.id ? folder.color : 'transparent', color: selectedFolderId === folder.id ? 'white' : 'inherit', borderColor: folder.color }}>
+                  {folder.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Bulk Actions */}
+          {isSelectionMode && selectedTaskIds.size > 0 && (
+            <div className="fixed bottom-20 left-4 right-4 z-40 bg-card border rounded-lg shadow-lg p-4">
+              <p className="text-sm mb-3 font-medium">{selectedTaskIds.size} task(s) selected</p>
+              <Button variant="outline" size="sm" onClick={handleBulkDelete}><Trash2 className="h-4 w-4 mr-2" />Delete</Button>
+            </div>
+          )}
+
+          {/* Tasks */}
+          {filteredItems.length === 0 ? (
+            <div className="text-center py-20"><p className="text-muted-foreground">No tasks yet. Tap "Add Task" to get started!</p></div>
           ) : (
-            pendingItems.map(item => (
-              <TaskItem
-                key={item.id}
-                item={item}
-                onUpdate={updateItem}
-                onDelete={deleteItem}
-                onTaskClick={setSelectedTask}
-                onImageClick={setImageViewerUrl}
-                isSelected={selectedItems.has(item.id)}
-                isSelectionMode={isSelectionMode}
-                onSelect={(id) => {
-                  const newSelected = new Set(selectedItems);
-                  if (newSelected.has(id)) {
-                    newSelected.delete(id);
-                  } else {
-                    newSelected.add(id);
-                  }
-                  setSelectedItems(newSelected);
-                }}
-              />
-            ))
+            <div className="space-y-4">
+              {uncompletedItems.length > 0 && (
+                <div className="space-y-2">
+                  {uncompletedItems.map((item) => (
+                    <TaskItem key={item.id} item={item} onUpdate={updateItem} onDelete={deleteItem} onTaskClick={setSelectedTask} onImageClick={setSelectedImage} isSelected={selectedTaskIds.has(item.id)} isSelectionMode={isSelectionMode} onSelect={handleSelectTask} />
+                  ))}
+                </div>
+              )}
+              {completedItems.length > 0 && (
+                <Collapsible open={isCompletedOpen} onOpenChange={setIsCompletedOpen}>
+                  <CollapsibleTrigger asChild>
+                    <button className="w-full flex items-center justify-between px-4 py-3 bg-muted rounded-lg hover:bg-muted/80 transition-colors">
+                      <span className="text-sm font-semibold text-muted-foreground uppercase">COMPLETED</span>
+                      <div className="flex items-center gap-2 text-muted-foreground"><span className="text-sm">{completedItems.length}</span>{isCompletedOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</div>
+                    </button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-2 mt-2">
+                    {completedItems.map((item) => (
+                      <TaskItem key={item.id} item={item} onUpdate={updateItem} onDelete={deleteItem} onTaskClick={setSelectedTask} onImageClick={setSelectedImage} isSelected={selectedTaskIds.has(item.id)} isSelectionMode={isSelectionMode} onSelect={handleSelectTask} />
+                    ))}
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+            </div>
           )}
         </div>
-
-        {/* Completed Tasks */}
-        {completedItems.length > 0 && (
-          <Collapsible open={completedOpen} onOpenChange={setCompletedOpen}>
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" className="w-full justify-start gap-2 mb-2">
-                {completedOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                Completed ({completedItems.length})
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-2">
-              {completedItems.map(item => (
-                <TaskItem
-                  key={item.id}
-                  item={item}
-                  onUpdate={updateItem}
-                  onDelete={deleteItem}
-                  onTaskClick={setSelectedTask}
-                  onImageClick={setImageViewerUrl}
-                  isSelected={selectedItems.has(item.id)}
-                  isSelectionMode={isSelectionMode}
-                  onSelect={(id) => {
-                    const newSelected = new Set(selectedItems);
-                    if (newSelected.has(id)) {
-                      newSelected.delete(id);
-                    } else {
-                      newSelected.add(id);
-                    }
-                    setSelectedItems(newSelected);
-                  }}
-                />
-              ))}
-            </CollapsibleContent>
-          </Collapsible>
-        )}
-
-        {/* FAB */}
-        <Button
-          className="fixed bottom-20 right-4 h-14 w-14 rounded-full shadow-lg"
-          onClick={async () => {
-            try {
-              await Haptics.impact({ style: ImpactStyle.Medium });
-            } catch {}
-            // Add task logic
-          }}
-        >
-          <Plus className="h-6 w-6" />
-        </Button>
-
-        {/* Delete Dialog */}
-        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Tasks</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete {selectedItems.size} task(s)? This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleBulkDelete}>Delete</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </main>
+
+      <Button onClick={async () => { try { await Haptics.impact({ style: ImpactStyle.Medium }); } catch {} setIsInputOpen(true); }} className="fixed bottom-20 left-4 right-4 z-30 h-12 text-base font-semibold" size="lg">
+        <Plus className="h-5 w-5" />Add Task
+      </Button>
+
+      <TaskInputSheet isOpen={isInputOpen} onClose={() => setIsInputOpen(false)} onAddTask={handleAddTask} folders={folders} selectedFolderId={selectedFolderId} onCreateFolder={handleCreateFolder} />
+      <TaskDetailSheet isOpen={!!selectedTask} task={selectedTask} onClose={() => setSelectedTask(null)} onUpdate={(updatedTask) => { updateItem(updatedTask.id, updatedTask); setSelectedTask(updatedTask); }} onDelete={deleteItem} onDuplicate={duplicateTask} />
+
+      <Dialog open={!!selectedImage} onOpenChange={(open) => !open && setSelectedImage(null)}>
+        <DialogContent className="max-w-3xl"><DialogHeader><DialogTitle>Task Image</DialogTitle></DialogHeader>
+          <div className="flex items-center justify-center"><img src={selectedImage || ''} alt="Task attachment" className="max-w-full max-h-[70vh] object-contain rounded-lg" /></div>
+        </DialogContent>
+      </Dialog>
     </TodoLayout>
   );
 };
