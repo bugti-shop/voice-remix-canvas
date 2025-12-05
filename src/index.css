@@ -77,28 +77,6 @@
     min-width: 260px;
     min-height: 200px;
   }
-
-  .lined-note {
-    --line-gap: 1.75rem;
-    --first-line-offset: 1.25rem;
-    background-color: white !important;
-    background-image: linear-gradient(
-      transparent,
-      transparent calc(var(--line-gap) - 1px),
-      hsl(var(--muted-foreground) / 0.4) calc(var(--line-gap) - 1px),
-      hsl(var(--muted-foreground) / 0.4) var(--line-gap)
-    );
-    background-size: 100% var(--line-gap);
-    background-position: 0 calc(var(--first-line-offset) - 1px);
-    background-origin: padding-box;
-    background-attachment: local;
-    line-height: var(--line-gap);
-    padding-top: var(--first-line-offset);
-  }
-
-  .dark .lined-note {
-    background-color: #1a1a1a !important;
-  }
 }
 
 @layer base {
