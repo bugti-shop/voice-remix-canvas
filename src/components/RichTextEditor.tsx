@@ -56,45 +56,75 @@ const HIGHLIGHT_COLORS = [
   { name: 'Orange', value: '#FED7AA' },
 ];
 
-const FONT_FAMILIES = [
-  { name: 'Default', value: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
-  { name: 'Inter', value: '"Inter", sans-serif' },
-  { name: 'Roboto', value: '"Roboto", sans-serif' },
-  { name: 'Open Sans', value: '"Open Sans", sans-serif' },
-  { name: 'Lato', value: '"Lato", sans-serif' },
-  { name: 'Montserrat', value: '"Montserrat", sans-serif' },
-  { name: 'Poppins', value: '"Poppins", sans-serif' },
-  { name: 'Raleway', value: '"Raleway", sans-serif' },
-  { name: 'Playfair Display', value: '"Playfair Display", serif' },
-  { name: 'Merriweather', value: '"Merriweather", serif' },
-  { name: 'Crimson Text', value: '"Crimson Text", serif' },
-  { name: 'Dancing Script', value: '"Dancing Script", cursive' },
-  { name: 'Pacifico', value: '"Pacifico", cursive' },
-  { name: 'Indie Flower', value: '"Indie Flower", cursive' },
-  { name: 'Shadows Into Light', value: '"Shadows Into Light", cursive' },
-  { name: 'Permanent Marker', value: '"Permanent Marker", cursive' },
-  { name: 'Courier Prime', value: '"Courier Prime", monospace' },
-  { name: 'Space Mono', value: '"Space Mono", monospace' },
-  { name: 'Fira Code', value: '"Fira Code", monospace' },
-  { name: 'Source Code Pro', value: '"Source Code Pro", monospace' },
-  { name: 'Noto Serif', value: '"Noto Serif", serif' },
-  { name: 'Nunito', value: '"Nunito", sans-serif' },
-  { name: 'Ubuntu', value: '"Ubuntu", sans-serif' },
-  { name: 'Quicksand', value: '"Quicksand", sans-serif' },
-  { name: 'Josefin Sans', value: '"Josefin Sans", sans-serif' },
-  { name: 'Work Sans', value: '"Work Sans", sans-serif' },
-  { name: 'PT Sans', value: '"PT Sans", sans-serif' },
-  { name: 'Cabin', value: '"Cabin", sans-serif' },
-  { name: 'Bebas Neue', value: '"Bebas Neue", cursive' },
-  { name: 'Oswald', value: '"Oswald", sans-serif' },
-  { name: 'Archivo', value: '"Archivo", sans-serif' },
+const FONT_CATEGORIES = [
+  {
+    category: 'Sans Serif',
+    fonts: [
+      { name: 'Default', value: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', sample: 'Clean & Modern' },
+      { name: 'Inter', value: '"Inter", sans-serif', sample: 'The quick brown fox' },
+      { name: 'Roboto', value: '"Roboto", sans-serif', sample: 'The quick brown fox' },
+      { name: 'Open Sans', value: '"Open Sans", sans-serif', sample: 'The quick brown fox' },
+      { name: 'Lato', value: '"Lato", sans-serif', sample: 'The quick brown fox' },
+      { name: 'Montserrat', value: '"Montserrat", sans-serif', sample: 'Bold & Elegant' },
+      { name: 'Poppins', value: '"Poppins", sans-serif', sample: 'Geometric Style' },
+      { name: 'Raleway', value: '"Raleway", sans-serif', sample: 'Thin & Stylish' },
+      { name: 'Nunito', value: '"Nunito", sans-serif', sample: 'Rounded & Friendly' },
+      { name: 'Ubuntu', value: '"Ubuntu", sans-serif', sample: 'The quick brown fox' },
+      { name: 'Quicksand', value: '"Quicksand", sans-serif', sample: 'Light & Airy' },
+      { name: 'Josefin Sans', value: '"Josefin Sans", sans-serif', sample: 'Vintage Modern' },
+      { name: 'Work Sans', value: '"Work Sans", sans-serif', sample: 'Professional' },
+      { name: 'PT Sans', value: '"PT Sans", sans-serif', sample: 'The quick brown fox' },
+      { name: 'Cabin', value: '"Cabin", sans-serif', sample: 'Humanist Style' },
+      { name: 'Oswald', value: '"Oswald", sans-serif', sample: 'CONDENSED STYLE' },
+      { name: 'Archivo', value: '"Archivo", sans-serif', sample: 'Grotesque Sans' },
+    ]
+  },
+  {
+    category: 'Serif',
+    fonts: [
+      { name: 'Playfair Display', value: '"Playfair Display", serif', sample: 'Elegant Headlines' },
+      { name: 'Merriweather', value: '"Merriweather", serif', sample: 'Reading Comfort' },
+      { name: 'Crimson Text', value: '"Crimson Text", serif', sample: 'Book Typography' },
+      { name: 'Noto Serif', value: '"Noto Serif", serif', sample: 'Classic Style' },
+    ]
+  },
+  {
+    category: 'Display & Decorative',
+    fonts: [
+      { name: 'Bebas Neue', value: '"Bebas Neue", cursive', sample: 'BOLD HEADLINES' },
+      { name: 'Dancing Script', value: '"Dancing Script", cursive', sample: 'Casual Elegance' },
+      { name: 'Pacifico', value: '"Pacifico", cursive', sample: 'Fun & Playful' },
+      { name: 'Indie Flower', value: '"Indie Flower", cursive', sample: 'Hand Written' },
+      { name: 'Shadows Into Light', value: '"Shadows Into Light", cursive', sample: 'Sketchy Notes' },
+      { name: 'Permanent Marker', value: '"Permanent Marker", cursive', sample: 'Bold Marker' },
+    ]
+  },
+  {
+    category: 'Monospace',
+    fonts: [
+      { name: 'Courier Prime', value: '"Courier Prime", monospace', sample: 'const code = true;' },
+      { name: 'Space Mono', value: '"Space Mono", monospace', sample: 'function() {}' },
+      { name: 'Fira Code', value: '"Fira Code", monospace', sample: '=> !== ===' },
+      { name: 'Source Code Pro', value: '"Source Code Pro", monospace', sample: 'console.log()' },
+    ]
+  }
+];
+
+const FONT_WEIGHTS = [
+  { name: 'Light', value: '300' },
+  { name: 'Regular', value: '400' },
+  { name: 'Medium', value: '500' },
+  { name: 'Semi Bold', value: '600' },
+  { name: 'Bold', value: '700' },
 ];
 
 const FONT_SIZES = [
+  { name: 'Extra Small', value: '12px' },
   { name: 'Small', value: '14px' },
   { name: 'Medium', value: '16px' },
   { name: 'Large', value: '20px' },
   { name: 'Extra Large', value: '24px' },
+  { name: 'Huge', value: '32px' },
 ];
 
 export const RichTextEditor = ({
@@ -107,9 +137,9 @@ export const RichTextEditor = ({
   title = '',
   onTitleChange,
   showTitle = false,
-  fontFamily = FONT_FAMILIES[0].value,
+  fontFamily = FONT_CATEGORIES[0].fonts[0].value,
   onFontFamilyChange,
-  fontSize = FONT_SIZES[1].value,
+  fontSize = FONT_SIZES[2].value,
   onFontSizeChange,
 }: RichTextEditorProps) => {
   const editorRef = useRef<HTMLDivElement>(null);
@@ -579,19 +609,49 @@ export const RichTextEditor = ({
               <span className="text-xs font-semibold">Aa</span>
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-64 max-h-96 overflow-y-auto">
-            <div className="flex flex-col gap-1">
-              {FONT_FAMILIES.map((font) => (
-                <Button
-                  key={font.value}
-                  onClick={() => onFontFamilyChange(font.value)}
-                  variant={fontFamily === font.value ? 'default' : 'ghost'}
-                  size="sm"
-                  className="justify-start"
-                  style={{ fontFamily: font.value }}
-                >
-                  {font.name}
-                </Button>
+          <PopoverContent className="w-80 max-h-[70vh] overflow-y-auto p-0">
+            <div className="p-3 border-b sticky top-0 bg-background z-10">
+              <h4 className="font-semibold text-sm">Choose Font</h4>
+            </div>
+            <div className="p-2">
+              {FONT_CATEGORIES.map((category) => (
+                <div key={category.category} className="mb-4">
+                  <h5 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-2 mb-2">
+                    {category.category}
+                  </h5>
+                  <div className="space-y-1">
+                    {category.fonts.map((font) => (
+                      <button
+                        key={font.value}
+                        onClick={() => onFontFamilyChange(font.value)}
+                        className={cn(
+                          "w-full text-left px-3 py-2.5 rounded-md transition-colors",
+                          fontFamily === font.value 
+                            ? "bg-primary text-primary-foreground" 
+                            : "hover:bg-secondary"
+                        )}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">{font.name}</span>
+                          {fontFamily === font.value && (
+                            <span className="text-xs">✓</span>
+                          )}
+                        </div>
+                        <p 
+                          className={cn(
+                            "text-lg mt-1",
+                            fontFamily === font.value 
+                              ? "text-primary-foreground/80" 
+                              : "text-muted-foreground"
+                          )}
+                          style={{ fontFamily: font.value }}
+                        >
+                          {font.sample}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           </PopoverContent>
@@ -611,18 +671,30 @@ export const RichTextEditor = ({
               <TextCursorInput className="h-4 w-4" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-2">
+          <PopoverContent className="w-56 p-2">
+            <div className="p-2 border-b mb-2">
+              <h4 className="font-semibold text-sm">Font Size</h4>
+            </div>
             <div className="flex flex-col gap-1">
               {FONT_SIZES.map((size) => (
-                <Button
+                <button
                   key={size.value}
                   onClick={() => onFontSizeChange(size.value)}
-                  variant={fontSize === size.value ? 'default' : 'ghost'}
-                  size="sm"
-                  className="justify-start"
+                  className={cn(
+                    "w-full text-left px-3 py-2 rounded-md transition-colors flex items-center justify-between",
+                    fontSize === size.value 
+                      ? "bg-primary text-primary-foreground" 
+                      : "hover:bg-secondary"
+                  )}
                 >
-                  {size.name}
-                </Button>
+                  <span style={{ fontSize: size.value }}>{size.name}</span>
+                  <span className={cn(
+                    "text-xs",
+                    fontSize === size.value ? "text-primary-foreground/70" : "text-muted-foreground"
+                  )}>
+                    {size.value}
+                  </span>
+                </button>
               ))}
             </div>
           </PopoverContent>
