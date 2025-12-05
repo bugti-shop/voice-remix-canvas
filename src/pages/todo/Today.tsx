@@ -211,17 +211,19 @@ const Today = () => {
               )}
               {completedItems.length > 0 && (
                 <Collapsible open={isCompletedOpen} onOpenChange={setIsCompletedOpen}>
-                  <CollapsibleTrigger asChild>
-                    <button className="w-full flex items-center justify-between px-4 py-3 bg-muted rounded-lg hover:bg-muted/80 transition-colors">
-                      <span className="text-sm font-semibold text-muted-foreground uppercase">COMPLETED</span>
-                      <div className="flex items-center gap-2 text-muted-foreground"><span className="text-sm">{completedItems.length}</span>{isCompletedOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</div>
-                    </button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-2 mt-2">
-                    {completedItems.map((item) => (
-                      <TaskItem key={item.id} item={item} onUpdate={updateItem} onDelete={deleteItem} onTaskClick={setSelectedTask} onImageClick={setSelectedImage} isSelected={selectedTaskIds.has(item.id)} isSelectionMode={isSelectionMode} onSelect={handleSelectTask} />
-                    ))}
-                  </CollapsibleContent>
+                  <div className="bg-muted/50 rounded-xl p-3 border border-border/30">
+                    <CollapsibleTrigger asChild>
+                      <button className="w-full flex items-center justify-between px-2 py-2 hover:bg-muted/60 rounded-lg transition-colors">
+                        <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">COMPLETED</span>
+                        <div className="flex items-center gap-2 text-muted-foreground"><span className="text-sm font-medium">{completedItems.length}</span>{isCompletedOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</div>
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-2 mt-2">
+                      {completedItems.map((item) => (
+                        <TaskItem key={item.id} item={item} onUpdate={updateItem} onDelete={deleteItem} onTaskClick={setSelectedTask} onImageClick={setSelectedImage} isSelected={selectedTaskIds.has(item.id)} isSelectionMode={isSelectionMode} onSelect={handleSelectTask} />
+                      ))}
+                    </CollapsibleContent>
+                  </div>
                 </Collapsible>
               )}
             </div>
