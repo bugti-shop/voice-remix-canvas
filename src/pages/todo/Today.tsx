@@ -295,7 +295,7 @@ const Today = () => {
           }}
           className={cn("h-5 w-5", item.completed && "border-muted-foreground/50")}
         />
-        <span className={cn("flex-1 text-sm", item.completed && "line-through text-muted-foreground")} onClick={() => setSelectedTask(item)}>
+        <span className={cn("flex-1 text-sm", item.completed && "text-muted-foreground")} onClick={() => setSelectedTask(item)}>
           {item.text}
         </span>
       </div>
