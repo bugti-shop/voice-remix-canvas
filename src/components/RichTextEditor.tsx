@@ -37,6 +37,8 @@ interface RichTextEditorProps {
   onFontFamilyChange?: (fontFamily: string) => void;
   fontSize?: string;
   onFontSizeChange?: (fontSize: string) => void;
+  fontWeight?: string;
+  onFontWeightChange?: (fontWeight: string) => void;
 }
 
 const COLORS = [
@@ -141,6 +143,8 @@ export const RichTextEditor = ({
   onFontFamilyChange,
   fontSize = FONT_SIZES[2].value,
   onFontSizeChange,
+  fontWeight = FONT_WEIGHTS[1].value,
+  onFontWeightChange,
 }: RichTextEditorProps) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const [showLinkInput, setShowLinkInput] = useState(false);
@@ -700,6 +704,50 @@ export const RichTextEditor = ({
           </PopoverContent>
         </Popover>
       )}
+
+      {onFontWeightChange && (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2"
+              title="Font Weight"
+            >
+              <Bold className="h-4 w-4" />
+              <span className="text-[10px] ml-0.5">W</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-48 p-2">
+            <div className="p-2 border-b mb-2">
+              <h4 className="font-semibold text-sm">Font Weight</h4>
+            </div>
+            <div className="flex flex-col gap-1">
+              {FONT_WEIGHTS.map((weight) => (
+                <button
+                  key={weight.value}
+                  onClick={() => onFontWeightChange(weight.value)}
+                  className={cn(
+                    "w-full text-left px-3 py-2 rounded-md transition-colors flex items-center justify-between",
+                    fontWeight === weight.value 
+                      ? "bg-primary text-primary-foreground" 
+                      : "hover:bg-secondary"
+                  )}
+                >
+                  <span style={{ fontWeight: weight.value }}>{weight.name}</span>
+                  <span className={cn(
+                    "text-xs",
+                    fontWeight === weight.value ? "text-primary-foreground/70" : "text-muted-foreground"
+                  )}>
+                    {weight.value}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
     </div>
   );
 
@@ -761,7 +809,8 @@ export const RichTextEditor = ({
         style={{
           paddingBottom: 'calc(8rem + var(--keyboard-inset, 0px))',
           fontFamily,
-          fontSize
+          fontSize,
+          fontWeight
         }}
         suppressContentEditableWarning
       />
