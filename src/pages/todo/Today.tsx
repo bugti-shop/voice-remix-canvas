@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { TodoItem, Folder, Priority, Note } from '@/types/note';
-import { Plus, FolderIcon, ChevronRight, ChevronDown, MoreVertical, Eye, EyeOff, ArrowUpDown, Copy, MousePointer2, FolderPlus, Settings, LayoutList, LayoutGrid, Trash2 } from 'lucide-react';
+import { Plus, FolderIcon, ChevronRight, ChevronDown, MoreVertical, Eye, EyeOff, ArrowUpDown, Copy, MousePointer2, FolderPlus, Settings, LayoutList, LayoutGrid, Trash2, ListPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { TaskInputSheet } from '@/components/TaskInputSheet';
@@ -12,6 +12,7 @@ import { FolderManageSheet } from '@/components/FolderManageSheet';
 import { MoveToFolderSheet } from '@/components/MoveToFolderSheet';
 import { SelectActionsSheet, SelectAction } from '@/components/SelectActionsSheet';
 import { PrioritySelectSheet } from '@/components/PrioritySelectSheet';
+import { BatchTaskSheet } from '@/components/BatchTaskSheet';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { notificationManager } from '@/utils/notifications';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -41,6 +42,7 @@ const Today = () => {
   const [isMoveToFolderOpen, setIsMoveToFolderOpen] = useState(false);
   const [isSelectActionsOpen, setIsSelectActionsOpen] = useState(false);
   const [isPrioritySheetOpen, setIsPrioritySheetOpen] = useState(false);
+  const [isBatchTaskOpen, setIsBatchTaskOpen] = useState(false);
   const [groupBy, setGroupBy] = useState<GroupBy>('custom');
   const [sortBy, setSortBy] = useState<SortBy>('custom');
   const [viewMode, setViewMode] = useState<ViewMode>('card');
@@ -101,6 +103,17 @@ const Today = () => {
       try { await notificationManager.scheduleTaskReminder(newItem); } catch (error) { console.error('Failed to schedule notification:', error); }
     }
     setItems([newItem, ...items]);
+  };
+
+  const handleBatchAddTasks = (taskTexts: string[]) => {
+    const newItems: TodoItem[] = taskTexts.map((text, idx) => ({
+      id: `${Date.now()}-${idx}`,
+      text,
+      completed: false,
+      folderId: selectedFolderId || undefined,
+    }));
+    setItems([...newItems, ...items]);
+    toast.success(`Added ${newItems.length} task(s)`);
   };
 
   const updateItem = async (itemId: string, updates: Partial<TodoItem>) => {
@@ -320,6 +333,9 @@ const Today = () => {
                     <DropdownMenuItem onClick={() => setIsDuplicateSheetOpen(true)} className="cursor-pointer">
                       <Copy className="h-4 w-4 mr-2" />Duplicate
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setIsBatchTaskOpen(true)} className="cursor-pointer">
+                      <ListPlus className="h-4 w-4 mr-2" />Add Multiple Tasks
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => { setIsSelectionMode(true); setIsSelectActionsOpen(true); }} className="cursor-pointer">
                       <MousePointer2 className="h-4 w-4 mr-2" />Select
                     </DropdownMenuItem>
@@ -410,6 +426,7 @@ const Today = () => {
       <MoveToFolderSheet isOpen={isMoveToFolderOpen} onClose={() => setIsMoveToFolderOpen(false)} folders={folders} onSelect={handleMoveToFolder} />
       <SelectActionsSheet isOpen={isSelectActionsOpen} onClose={() => setIsSelectActionsOpen(false)} selectedCount={selectedTaskIds.size} onAction={handleSelectAction} />
       <PrioritySelectSheet isOpen={isPrioritySheetOpen} onClose={() => setIsPrioritySheetOpen(false)} onSelect={handleSetPriority} />
+      <BatchTaskSheet isOpen={isBatchTaskOpen} onClose={() => setIsBatchTaskOpen(false)} onAddTasks={handleBatchAddTasks} />
 
       <Dialog open={!!selectedImage} onOpenChange={(open) => !open && setSelectedImage(null)}>
         <DialogContent className="max-w-3xl"><DialogHeader><DialogTitle>Task Image</DialogTitle></DialogHeader>
