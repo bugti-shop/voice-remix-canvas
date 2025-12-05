@@ -5,6 +5,9 @@ import { NoteEditor } from '@/components/NoteEditor';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { PersonalizedTips } from '@/components/PersonalizedTips';
 import { FolderManager } from '@/components/FolderManager';
+import { SyncBadge } from '@/components/SyncStatusIndicator';
+import { useRealtimeSync } from '@/hooks/useRealtimeSync';
+import { syncManager } from '@/utils/syncManager';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -34,6 +37,8 @@ const Index = () => {
   const [defaultType, setDefaultType] = useState<NoteType>('regular');
   const [draggedNoteId, setDraggedNoteId] = useState<string | null>(null);
   const [upcomingReminders, setUpcomingReminders] = useState<any[]>([]);
+  const { isOnline, isSyncing, hasError, lastSync } = useRealtimeSync();
+  const syncEnabled = syncManager.isSyncEnabled();
 
   // Check onboarding status on mount
   useEffect(() => {
@@ -248,6 +253,14 @@ const Index = () => {
               <h1 className="text-xl font-bold">Npd</h1>
             </div>
             <div className="flex items-center gap-2">
+              {syncEnabled && (
+                <SyncBadge
+                  isOnline={isOnline}
+                  isSyncing={isSyncing}
+                  lastSync={lastSync}
+                  hasError={hasError}
+                />
+              )}
               <Button
                 size="icon"
                 variant="ghost"
