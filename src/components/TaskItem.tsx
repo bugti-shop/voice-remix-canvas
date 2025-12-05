@@ -86,8 +86,10 @@ export const TaskItem = ({
                 }}
                 onClick={(e) => e.stopPropagation()}
                 className={cn(
-                  "h-6 w-6 rounded-full border-2 flex-shrink-0 transition-all",
-                  item.completed ? "bg-green-500 border-green-500 data-[state=checked]:bg-green-500 data-[state=checked]:text-white scale-110" : getPriorityBorderColor(item.priority)
+                  "h-6 w-6 flex-shrink-0 transition-all",
+                  item.completed 
+                    ? "rounded-sm border-2 border-muted-foreground/50 bg-muted-foreground/20 data-[state=checked]:bg-muted-foreground/20 data-[state=checked]:text-muted-foreground" 
+                    : cn("rounded-full border-2", getPriorityBorderColor(item.priority))
                 )}
               />
             </div>
