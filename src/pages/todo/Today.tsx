@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { TodoItem, Folder, Priority, Note } from '@/types/note';
-import { Plus, FolderIcon, ChevronRight, ChevronDown, MoreVertical, Eye, EyeOff, ArrowUpDown, Copy, MousePointer2, FolderPlus, Settings, LayoutList, LayoutGrid, Trash2, ListPlus } from 'lucide-react';
+import { Plus, FolderIcon, ChevronRight, ChevronDown, MoreVertical, Eye, EyeOff, Filter, Copy, MousePointer2, FolderPlus, Settings, LayoutList, LayoutGrid, Trash2, ListPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { TaskInputSheet } from '@/components/TaskInputSheet';
 import { TaskDetailSheet } from '@/components/TaskDetailSheet';
 import { TaskItem } from '@/components/TaskItem';
-import { TaskOptionsSheet, GroupBy, SortBy } from '@/components/TaskOptionsSheet';
+import { TaskFilterSheet, DateFilter, PriorityFilter, StatusFilter } from '@/components/TaskFilterSheet';
 import { DuplicateOptionsSheet, DuplicateOption } from '@/components/DuplicateOptionsSheet';
 import { FolderManageSheet } from '@/components/FolderManageSheet';
 import { MoveToFolderSheet } from '@/components/MoveToFolderSheet';
@@ -21,6 +21,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Checkbox } from '@/components/ui/checkbox';
 import { TodoLayout } from './TodoLayout';
 import { toast } from 'sonner';
+import { isToday, isTomorrow, isThisWeek, isBefore, startOfDay } from 'date-fns';
 
 type ViewMode = 'card' | 'flat';
 
@@ -28,7 +29,6 @@ const Today = () => {
   const [items, setItems] = useState<TodoItem[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
-  const [selectedPriority, setSelectedPriority] = useState<Priority | 'all'>('all');
   const [isInputOpen, setIsInputOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<TodoItem | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -36,15 +36,16 @@ const Today = () => {
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [isCompletedOpen, setIsCompletedOpen] = useState(false);
   const [showCompleted, setShowCompleted] = useState(true);
-  const [isOptionsSheetOpen, setIsOptionsSheetOpen] = useState(false);
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [isDuplicateSheetOpen, setIsDuplicateSheetOpen] = useState(false);
   const [isFolderManageOpen, setIsFolderManageOpen] = useState(false);
   const [isMoveToFolderOpen, setIsMoveToFolderOpen] = useState(false);
   const [isSelectActionsOpen, setIsSelectActionsOpen] = useState(false);
   const [isPrioritySheetOpen, setIsPrioritySheetOpen] = useState(false);
   const [isBatchTaskOpen, setIsBatchTaskOpen] = useState(false);
-  const [groupBy, setGroupBy] = useState<GroupBy>('custom');
-  const [sortBy, setSortBy] = useState<SortBy>('custom');
+  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('flat');
 
   useEffect(() => {
@@ -68,10 +69,12 @@ const Today = () => {
 
     const savedShowCompleted = localStorage.getItem('todoShowCompleted');
     if (savedShowCompleted !== null) setShowCompleted(JSON.parse(savedShowCompleted));
-    const savedGroupBy = localStorage.getItem('todoGroupBy');
-    if (savedGroupBy) setGroupBy(savedGroupBy as GroupBy);
-    const savedSortBy = localStorage.getItem('todoSortBy');
-    if (savedSortBy) setSortBy(savedSortBy as SortBy);
+    const savedDateFilter = localStorage.getItem('todoDateFilter');
+    if (savedDateFilter) setDateFilter(savedDateFilter as DateFilter);
+    const savedPriorityFilter = localStorage.getItem('todoPriorityFilter');
+    if (savedPriorityFilter) setPriorityFilter(savedPriorityFilter as PriorityFilter);
+    const savedStatusFilter = localStorage.getItem('todoStatusFilter');
+    if (savedStatusFilter) setStatusFilter(savedStatusFilter as StatusFilter);
     const savedViewMode = localStorage.getItem('todoViewMode');
     if (savedViewMode) setViewMode(savedViewMode as ViewMode);
   }, []);
@@ -79,7 +82,11 @@ const Today = () => {
   useEffect(() => { localStorage.setItem('todoItems', JSON.stringify(items)); }, [items]);
   useEffect(() => { localStorage.setItem('todoFolders', JSON.stringify(folders)); }, [folders]);
   useEffect(() => { localStorage.setItem('todoShowCompleted', JSON.stringify(showCompleted)); }, [showCompleted]);
-  useEffect(() => { localStorage.setItem('todoGroupBy', groupBy); localStorage.setItem('todoSortBy', sortBy); }, [groupBy, sortBy]);
+  useEffect(() => { 
+    localStorage.setItem('todoDateFilter', dateFilter); 
+    localStorage.setItem('todoPriorityFilter', priorityFilter);
+    localStorage.setItem('todoStatusFilter', statusFilter);
+  }, [dateFilter, priorityFilter, statusFilter]);
   useEffect(() => { localStorage.setItem('todoViewMode', viewMode); }, [viewMode]);
 
   const handleCreateFolder = (name: string, color: string) => {
@@ -244,40 +251,67 @@ const Today = () => {
 
   const processedItems = useMemo(() => {
     let filtered = items.filter(item => {
+      // Folder filter
       const folderMatch = selectedFolderId ? item.folderId === selectedFolderId : true;
-      const priorityMatch = selectedPriority === 'all' ? true : item.priority === selectedPriority;
-      return folderMatch && priorityMatch;
+      
+      // Priority filter
+      const priorityMatch = priorityFilter === 'all' ? true : item.priority === priorityFilter;
+      
+      // Status filter
+      let statusMatch = true;
+      if (statusFilter === 'completed') statusMatch = item.completed;
+      else if (statusFilter === 'uncompleted') statusMatch = !item.completed;
+      
+      // Date filter
+      let dateMatch = true;
+      if (dateFilter !== 'all') {
+        const today = startOfDay(new Date());
+        const itemDate = item.dueDate ? new Date(item.dueDate) : null;
+        
+        switch (dateFilter) {
+          case 'today':
+            dateMatch = itemDate ? isToday(itemDate) : false;
+            break;
+          case 'tomorrow':
+            dateMatch = itemDate ? isTomorrow(itemDate) : false;
+            break;
+          case 'this-week':
+            dateMatch = itemDate ? isThisWeek(itemDate) : false;
+            break;
+          case 'overdue':
+            dateMatch = itemDate ? isBefore(itemDate, today) && !item.completed : false;
+            break;
+          case 'has-date':
+            dateMatch = !!itemDate;
+            break;
+          case 'no-date':
+            dateMatch = !itemDate;
+            break;
+        }
+      }
+      
+      return folderMatch && priorityMatch && statusMatch && dateMatch;
     });
 
-    if (sortBy === 'date') {
-      filtered = [...filtered].sort((a, b) => {
-        const dateA = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
-        const dateB = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
-        return dateA - dateB;
-      });
-    } else if (sortBy === 'priority') {
-      const priorityOrder: Record<Priority | 'none', number> = { high: 0, medium: 1, low: 2, none: 3 };
-      filtered = [...filtered].sort((a, b) => (priorityOrder[a.priority || 'none'] || 3) - (priorityOrder[b.priority || 'none'] || 3));
-    }
+    // Sort by date (tasks with dates first, then by date)
+    filtered = [...filtered].sort((a, b) => {
+      const dateA = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+      const dateB = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+      return dateA - dateB;
+    });
 
     return filtered;
-  }, [items, selectedFolderId, selectedPriority, sortBy]);
+  }, [items, selectedFolderId, priorityFilter, statusFilter, dateFilter]);
 
   const uncompletedItems = processedItems.filter(item => !item.completed);
   const completedItems = processedItems.filter(item => item.completed);
 
-  const groupedItems = useMemo(() => {
-    if (groupBy === 'custom') return null;
-    const groups: Record<string, TodoItem[]> = {};
-    uncompletedItems.forEach(item => {
-      let key = 'No Group';
-      if (groupBy === 'date') key = item.dueDate ? new Date(item.dueDate).toLocaleDateString() : 'No Date';
-      else if (groupBy === 'priority') key = item.priority ? item.priority.charAt(0).toUpperCase() + item.priority.slice(1) : 'No Priority';
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(item);
-    });
-    return groups;
-  }, [uncompletedItems, groupBy]);
+  const handleClearFilters = () => {
+    setSelectedFolderId(null);
+    setDateFilter('all');
+    setPriorityFilter('all');
+    setStatusFilter('all');
+  };
 
   const renderTaskItem = (item: TodoItem) => (
     viewMode === 'flat' ? (
@@ -329,8 +363,8 @@ const Today = () => {
                       {showCompleted ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
                       {showCompleted ? 'Hide Completed' : 'Show Completed'}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setIsOptionsSheetOpen(true)} className="cursor-pointer">
-                      <ArrowUpDown className="h-4 w-4 mr-2" />Group & Sort
+                    <DropdownMenuItem onClick={() => setIsFilterSheetOpen(true)} className="cursor-pointer">
+                      <Filter className="h-4 w-4 mr-2" />Filter
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setIsDuplicateSheetOpen(true)} className="cursor-pointer">
                       <Copy className="h-4 w-4 mr-2" />Duplicate
@@ -387,14 +421,7 @@ const Today = () => {
             <div className="text-center py-20"><p className="text-muted-foreground">No tasks yet. Tap "Add Task" to get started!</p></div>
           ) : (
             <div className="space-y-4">
-              {groupBy !== 'custom' && groupedItems ? (
-                Object.entries(groupedItems).map(([groupName, groupTasks]) => (
-                  <div key={groupName} className="space-y-2">
-                    <h3 className="text-sm font-semibold text-muted-foreground px-2">{groupName}</h3>
-                    {groupTasks.map(renderTaskItem)}
-                  </div>
-                ))
-              ) : uncompletedItems.length > 0 && (
+              {uncompletedItems.length > 0 && (
                 <div className="space-y-2">{uncompletedItems.map(renderTaskItem)}</div>
               )}
 
@@ -422,7 +449,7 @@ const Today = () => {
 
       <TaskInputSheet isOpen={isInputOpen} onClose={() => setIsInputOpen(false)} onAddTask={handleAddTask} folders={folders} selectedFolderId={selectedFolderId} onCreateFolder={handleCreateFolder} />
       <TaskDetailSheet isOpen={!!selectedTask} task={selectedTask} onClose={() => setSelectedTask(null)} onUpdate={(updatedTask) => { updateItem(updatedTask.id, updatedTask); setSelectedTask(updatedTask); }} onDelete={deleteItem} onDuplicate={duplicateTask} />
-      <TaskOptionsSheet isOpen={isOptionsSheetOpen} onClose={() => setIsOptionsSheetOpen(false)} groupBy={groupBy} sortBy={sortBy} onGroupByChange={setGroupBy} onSortByChange={setSortBy} />
+      <TaskFilterSheet isOpen={isFilterSheetOpen} onClose={() => setIsFilterSheetOpen(false)} folders={folders} selectedFolderId={selectedFolderId} onFolderChange={setSelectedFolderId} dateFilter={dateFilter} onDateFilterChange={setDateFilter} priorityFilter={priorityFilter} onPriorityFilterChange={setPriorityFilter} statusFilter={statusFilter} onStatusFilterChange={setStatusFilter} onClearAll={handleClearFilters} />
       <DuplicateOptionsSheet isOpen={isDuplicateSheetOpen} onClose={() => setIsDuplicateSheetOpen(false)} onSelect={handleDuplicate} />
       <FolderManageSheet isOpen={isFolderManageOpen} onClose={() => setIsFolderManageOpen(false)} folders={folders} onCreateFolder={handleCreateFolder} onEditFolder={handleEditFolder} onDeleteFolder={handleDeleteFolder} />
       <MoveToFolderSheet isOpen={isMoveToFolderOpen} onClose={() => setIsMoveToFolderOpen(false)} folders={folders} onSelect={handleMoveToFolder} />
