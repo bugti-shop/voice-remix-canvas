@@ -86,6 +86,7 @@ export interface Note {
   pinnedOrder?: number;
   fontFamily?: string;
   fontSize?: string;
+  fontWeight?: string;
   reminderEnabled?: boolean;
   reminderTime?: Date;
   reminderRecurring?: 'none' | 'daily' | 'weekly' | 'monthly';

@@ -66,6 +66,7 @@ export const NoteEditor = ({ note, isOpen, onClose, onSave, defaultType = 'regul
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
   const [fontFamily, setFontFamily] = useState<string>('-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif');
   const [fontSize, setFontSize] = useState<string>('16px');
+  const [fontWeight, setFontWeight] = useState<string>('400');
   const [createdAt, setCreatedAt] = useState<Date>(new Date());
   const [createdTime, setCreatedTime] = useState<string>('12:00');
   const [reminderEnabled, setReminderEnabled] = useState(false);
@@ -107,6 +108,7 @@ export const NoteEditor = ({ note, isOpen, onClose, onSave, defaultType = 'regul
       setSelectedFolderId(note.folderId);
       setFontFamily(note.fontFamily || '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif');
       setFontSize(note.fontSize || '16px');
+      setFontWeight(note.fontWeight || '400');
       const noteDate = new Date(note.createdAt);
       setCreatedAt(noteDate);
       setCreatedTime(format(noteDate, 'HH:mm'));
@@ -133,6 +135,7 @@ export const NoteEditor = ({ note, isOpen, onClose, onSave, defaultType = 'regul
       setSelectedFolderId(defaultFolderId);
       setFontFamily('-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif');
       setFontSize('16px');
+      setFontWeight('400');
       const now = new Date();
       setCreatedAt(now);
       setCreatedTime(format(now, 'HH:mm'));
@@ -193,6 +196,7 @@ export const NoteEditor = ({ note, isOpen, onClose, onSave, defaultType = 'regul
       folderId: selectedFolderId || noteType,
       fontFamily: (noteType === 'sticky' || noteType === 'lined' || noteType === 'regular') ? fontFamily : undefined,
       fontSize: (noteType === 'sticky' || noteType === 'lined' || noteType === 'regular') ? fontSize : undefined,
+      fontWeight: (noteType === 'sticky' || noteType === 'lined' || noteType === 'regular') ? fontWeight : undefined,
       codeContent: noteType === 'code' ? codeContent : undefined,
       codeLanguage: noteType === 'code' ? codeLanguage : undefined,
       reminderEnabled,
@@ -451,6 +455,8 @@ export const NoteEditor = ({ note, isOpen, onClose, onSave, defaultType = 'regul
             onFontFamilyChange={setFontFamily}
             fontSize={fontSize}
             onFontSizeChange={setFontSize}
+            fontWeight={fontWeight}
+            onFontWeightChange={setFontWeight}
           />
         )}
       </div>
