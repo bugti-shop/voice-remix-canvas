@@ -935,6 +935,35 @@ export const RichTextEditor = ({
           .title-input::placeholder {
             color: rgba(0, 0, 0, 0.3);
           }
+          /* Lined note paper styling */
+          .lined-note {
+            background-color: #fffef5;
+            background-image: 
+              linear-gradient(transparent 0%, transparent calc(1.5em - 1px), #e5e5e5 calc(1.5em - 1px), #e5e5e5 1.5em, transparent 1.5em);
+            background-size: 100% 1.5em;
+            background-attachment: local;
+            line-height: 1.5em !important;
+            padding-left: 60px !important;
+            position: relative;
+          }
+          .lined-note::before {
+            content: '';
+            position: absolute;
+            left: 50px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background-color: #ffb3b3;
+          }
+          /* Dark mode lined note */
+          .dark .lined-note {
+            background-color: #1a1a1a;
+            background-image: 
+              linear-gradient(transparent 0%, transparent calc(1.5em - 1px), #333 calc(1.5em - 1px), #333 1.5em, transparent 1.5em);
+          }
+          .dark .lined-note::before {
+            background-color: #ff6b6b;
+          }
         `}
       </style>
 
