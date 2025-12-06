@@ -1,6 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { Button } from '@/components/ui/button';
+import { Check } from 'lucide-react';
 
 interface ClockTimePickerProps {
   hour: string;
@@ -9,6 +11,8 @@ interface ClockTimePickerProps {
   onHourChange: (hour: string) => void;
   onMinuteChange: (minute: string) => void;
   onPeriodChange: (period: 'AM' | 'PM') => void;
+  onConfirm?: () => void;
+  showConfirmButton?: boolean;
 }
 
 type Mode = 'hour' | 'minute';
@@ -28,6 +32,8 @@ export const ClockTimePicker = ({
   onHourChange,
   onMinuteChange,
   onPeriodChange,
+  onConfirm,
+  showConfirmButton = true,
 }: ClockTimePickerProps) => {
   const [mode, setMode] = useState<Mode>('hour');
   const [isDragging, setIsDragging] = useState(false);
@@ -297,6 +303,20 @@ export const ClockTimePicker = ({
       <p className="text-xs text-muted-foreground">
         {mode === 'hour' ? 'Select hour' : 'Select minutes'}
       </p>
+
+      {/* Confirm Button */}
+      {showConfirmButton && onConfirm && (
+        <Button 
+          onClick={() => {
+            triggerHaptic();
+            onConfirm();
+          }}
+          className="w-full max-w-[200px] gap-2"
+        >
+          <Check className="w-4 h-4" />
+          Confirm Time
+        </Button>
+      )}
     </div>
   );
 };
