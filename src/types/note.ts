@@ -27,6 +27,7 @@ export interface TodoItem {
   tags?: string[];
   coloredTags?: ColoredTag[];
   folderId?: string;
+  sectionId?: string;
   imageUrl?: string;
   description?: string;
   subtasks?: TodoItem[];
@@ -47,11 +48,12 @@ export interface TaskTemplate {
   subtasks?: string[];
 }
 
-export interface TodoSection {
+export interface TaskSection {
   id: string;
-  title: string;
+  name: string;
   color: string;
-  items: TodoItem[];
+  isCollapsed: boolean;
+  order: number;
 }
 
 export interface CornellSection {
@@ -80,7 +82,7 @@ export interface Note {
   voiceRecordings: VoiceRecording[];
   folderId?: string;
   todoItems?: TodoItem[];
-  todoSections?: TodoSection[];
+  todoSections?: TaskSection[];
   todoName?: string;
   todoDate?: string;
   todoNotes?: string;
