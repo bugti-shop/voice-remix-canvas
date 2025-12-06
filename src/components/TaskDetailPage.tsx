@@ -373,29 +373,19 @@ export const TaskDetailPage = ({
                 {task.completed ? 'Mark as Incomplete' : 'Mark as Done'}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer p-0">
-                <DropdownMenu>
-                  <DropdownMenuTrigger className="w-full flex items-center px-2 py-1.5 cursor-pointer">
-                    <Flag className="h-4 w-4 mr-2" />
-                    Set Priority
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent side="left" className="bg-popover border shadow-lg z-[70]">
-                    <DropdownMenuItem onClick={() => handleSetPriority('high')} className="cursor-pointer">
-                      <Flag className="h-4 w-4 mr-2 text-red-500" />High
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleSetPriority('medium')} className="cursor-pointer">
-                      <Flag className="h-4 w-4 mr-2 text-orange-500" />Medium
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleSetPriority('low')} className="cursor-pointer">
-                      <Flag className="h-4 w-4 mr-2 text-green-500" />Low
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleSetPriority('none')} className="cursor-pointer">
-                      <Flag className="h-4 w-4 mr-2 text-muted-foreground" />None
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+              <DropdownMenuItem onClick={() => handleSetPriority('high')} className="cursor-pointer">
+                <Flag className="h-4 w-4 mr-2 text-red-500" />High Priority
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleSetPriority('medium')} className="cursor-pointer">
+                <Flag className="h-4 w-4 mr-2 text-orange-500" />Medium Priority
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleSetPriority('low')} className="cursor-pointer">
+                <Flag className="h-4 w-4 mr-2 text-green-500" />Low Priority
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleSetPriority('none')} className="cursor-pointer">
+                <Flag className="h-4 w-4 mr-2 text-muted-foreground" />No Priority
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleDuplicate} className="cursor-pointer">
                 <Copy className="h-4 w-4 mr-2" />Duplicate Task
               </DropdownMenuItem>
