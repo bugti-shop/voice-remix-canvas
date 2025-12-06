@@ -29,6 +29,7 @@ import {
   Settings2
 } from 'lucide-react';
 import { EditActionsSheet, ActionItem, defaultActions } from './EditActionsSheet';
+import { WaveformVisualizer } from './WaveformVisualizer';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format, addDays, startOfWeek, addWeeks } from 'date-fns';
@@ -88,6 +89,10 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const [audioData, setAudioData] = useState<Float32Array | null>(null);
+  const animationFrameRef = useRef<number>();
   
   const inputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -122,7 +127,13 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
       setIsRecording(false);
       setRecordingTime(0);
       setIsPlaying(false);
+      setAudioData(null);
       if (timerRef.current) clearInterval(timerRef.current);
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+        audioContextRef.current = null;
+      }
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
@@ -176,11 +187,40 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
 
+      // Set up audio analysis for waveform
+      const audioContext = new AudioContext();
+      audioContextRef.current = audioContext;
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+
+      // Start analyzing audio
+      const analyzeAudio = () => {
+        if (!analyserRef.current) return;
+        const dataArray = new Float32Array(analyserRef.current.frequencyBinCount);
+        analyserRef.current.getFloatTimeDomainData(dataArray);
+        setAudioData(new Float32Array(dataArray));
+        animationFrameRef.current = requestAnimationFrame(analyzeAudio);
+      };
+      analyzeAudio();
+
       mediaRecorder.ondataavailable = (e) => {
         chunksRef.current.push(e.data);
       };
 
       mediaRecorder.onstop = async () => {
+        // Stop audio analysis
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+        }
+        if (audioContextRef.current) {
+          audioContextRef.current.close();
+          audioContextRef.current = null;
+        }
+        setAudioData(null);
+
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
         const reader = new FileReader();
         reader.onloadend = () => {
@@ -221,6 +261,9 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
       setIsRecording(false);
       if (timerRef.current) {
         clearInterval(timerRef.current);
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
       }
       try {
         await Haptics.impact({ style: ImpactStyle.Medium });
@@ -451,6 +494,13 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
               </button>
             ) : isRecording ? (
               <div className="flex items-center gap-2">
+                <WaveformVisualizer 
+                  audioData={audioData} 
+                  isActive={isRecording} 
+                  barCount={12}
+                  color="hsl(var(--destructive))"
+                  className="h-8"
+                />
                 <span className="text-sm font-mono text-destructive animate-pulse">
                   {formatRecordingTime(recordingTime)}
                 </span>
@@ -484,8 +534,13 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
                   <Play className="h-5 w-5 text-primary-foreground ml-0.5" />
                 )}
               </button>
-              <div className="flex-1">
-                <p className="text-sm font-medium">Voice Recording</p>
+              <div className="flex-1 flex items-center gap-3">
+                <WaveformVisualizer 
+                  isActive={isPlaying} 
+                  barCount={16}
+                  color="hsl(var(--primary))"
+                  className="h-8 flex-1"
+                />
                 <p className="text-xs text-muted-foreground">
                   {formatRecordingTime(voiceRecording.duration)}
                 </p>

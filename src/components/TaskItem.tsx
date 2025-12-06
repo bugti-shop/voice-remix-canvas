@@ -4,6 +4,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ChevronDown, ChevronRight, Repeat, Trash2, Check, Tag, Play, Pause, Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { WaveformVisualizer } from './WaveformVisualizer';
 import {
   Collapsible,
   CollapsibleContent,
@@ -200,13 +201,19 @@ export const TaskItem = ({
                   <div className="flex items-center gap-1.5 mt-1">
                     <button
                       onClick={handlePlayVoice}
-                      className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
+                      className="flex items-center gap-2 px-2 py-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
                     >
                       {isPlayingVoice ? (
-                        <Pause className="h-3 w-3 text-primary" />
+                        <Pause className="h-3 w-3 text-primary flex-shrink-0" />
                       ) : (
-                        <Play className="h-3 w-3 text-primary" />
+                        <Play className="h-3 w-3 text-primary flex-shrink-0" />
                       )}
+                      <WaveformVisualizer 
+                        isActive={isPlayingVoice} 
+                        barCount={10}
+                        color="hsl(var(--primary))"
+                        className="h-4"
+                      />
                       <span className="text-[10px] text-primary font-medium">
                         {formatDuration(item.voiceRecording.duration)}
                       </span>
