@@ -55,20 +55,23 @@ export const ClockTimePicker = ({
     if (!clockRef.current) return null;
 
     const rect = clockRef.current.getBoundingClientRect();
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
 
-    const x = clientX - rect.left - centerX;
-    const y = clientY - rect.top - centerY;
+    const x = clientX - centerX;
+    const y = clientY - centerY;
 
-    let angle = Math.atan2(y, x) * (180 / Math.PI) + 90;
+    // Calculate angle from 12 o'clock position (top)
+    let angle = Math.atan2(x, -y) * (180 / Math.PI);
     if (angle < 0) angle += 360;
 
     if (mode === 'hour') {
       const hourValue = Math.round(angle / 30) % 12;
       return hourValue === 0 ? 12 : hourValue;
     } else {
-      return Math.round(angle / 6) % 60;
+      // Snap to nearest 5-minute interval for better UX, or allow any minute
+      const rawMinute = Math.round(angle / 6) % 60;
+      return rawMinute;
     }
   }, [mode]);
 
