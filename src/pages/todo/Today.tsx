@@ -463,7 +463,7 @@ const Today = () => {
             className={cn(
               "h-5 w-5 rounded-sm border-2 mt-0.5 flex-shrink-0",
               item.completed 
-                ? "border-muted-foreground/50" 
+                ? "border-muted-foreground/40 bg-transparent data-[state=checked]:bg-transparent data-[state=checked]:text-muted-foreground/60" 
                 : getPriorityBorderColor(item.priority)
             )}
           />
