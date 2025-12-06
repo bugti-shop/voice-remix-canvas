@@ -23,18 +23,18 @@ export const ClockTimePicker = ({
   const [mode, setMode] = useState<Mode>('hour');
   const clockRef = useRef<HTMLDivElement>(null);
 
-  const hours = Array.from({ length: 12 }, (_, i) => i + 1);
+  const hours = Array.from({ length: 12 }, (_, i) => i === 0 ? 12 : i);
   const minutes = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
-  const getPosition = (value: number, total: number, radius: number) => {
+  const getPosition = (value: number, total: number) => {
     const angle = ((value * 360) / total - 90) * (Math.PI / 180);
     return {
-      x: Math.cos(angle) * radius,
-      y: Math.sin(angle) * radius,
+      x: Math.cos(angle) * 50,
+      y: Math.sin(angle) * 50,
     };
   };
 
-  const handleClockClick = useCallback((e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+  const handleClockInteraction = useCallback((e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
     if (!clockRef.current) return;
 
     const rect = clockRef.current.getBoundingClientRect();
@@ -60,7 +60,7 @@ export const ClockTimePicker = ({
       const hourValue = Math.round(angle / 30);
       const selectedHour = hourValue === 0 ? 12 : hourValue;
       onHourChange(selectedHour.toString());
-      setMode('minute');
+      setTimeout(() => setMode('minute'), 200);
     } else {
       const minuteValue = Math.round(angle / 6) % 60;
       onMinuteChange(minuteValue.toString().padStart(2, '0'));
@@ -69,38 +69,38 @@ export const ClockTimePicker = ({
 
   const currentValue = mode === 'hour' ? parseInt(hour) : parseInt(minute);
   const handAngle = mode === 'hour' 
-    ? (currentValue * 30) - 90 
+    ? ((currentValue % 12) * 30) - 90 
     : (currentValue * 6) - 90;
 
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center gap-6 w-full max-w-xs mx-auto">
       {/* Time Display */}
-      <div className="flex items-center justify-center gap-1">
+      <div className="flex items-center justify-center">
         <button
           onClick={() => setMode('hour')}
           className={cn(
-            "text-4xl font-light px-2 py-1 rounded-lg transition-colors",
-            mode === 'hour' ? "bg-primary/20 text-primary" : "text-foreground"
+            "text-5xl font-medium transition-colors",
+            mode === 'hour' ? "text-primary" : "text-muted-foreground"
           )}
         >
           {hour.padStart(2, '0')}
         </button>
-        <span className="text-4xl font-light text-foreground">:</span>
+        <span className="text-5xl font-medium text-muted-foreground mx-1">:</span>
         <button
           onClick={() => setMode('minute')}
           className={cn(
-            "text-4xl font-light px-2 py-1 rounded-lg transition-colors",
-            mode === 'minute' ? "bg-primary/20 text-primary" : "text-foreground"
+            "text-5xl font-medium transition-colors",
+            mode === 'minute' ? "text-primary" : "text-muted-foreground"
           )}
         >
           {minute.padStart(2, '0')}
         </button>
-        <div className="flex flex-col ml-2 gap-1">
+        <div className="flex flex-col ml-3 gap-0.5">
           <button
             onClick={() => onPeriodChange('AM')}
             className={cn(
-              "text-sm font-medium px-2 py-0.5 rounded transition-colors",
-              period === 'AM' ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+              "text-sm font-semibold px-1.5 py-0.5 rounded transition-colors",
+              period === 'AM' ? "text-primary" : "text-muted-foreground"
             )}
           >
             AM
@@ -108,8 +108,8 @@ export const ClockTimePicker = ({
           <button
             onClick={() => onPeriodChange('PM')}
             className={cn(
-              "text-sm font-medium px-2 py-0.5 rounded transition-colors",
-              period === 'PM' ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+              "text-sm font-semibold px-1.5 py-0.5 rounded transition-colors",
+              period === 'PM' ? "text-primary" : "text-muted-foreground"
             )}
           >
             PM
@@ -120,49 +120,52 @@ export const ClockTimePicker = ({
       {/* Clock Face */}
       <div
         ref={clockRef}
-        onClick={handleClockClick}
-        onTouchStart={handleClockClick}
-        className="relative w-56 h-56 rounded-full bg-muted cursor-pointer select-none"
+        onClick={handleClockInteraction}
+        onTouchStart={handleClockInteraction}
+        className="relative w-full aspect-square max-w-[280px] rounded-full bg-muted/50 cursor-pointer select-none"
+        style={{ touchAction: 'none' }}
       >
-        {/* Clock Center */}
-        <div className="absolute top-1/2 left-1/2 w-3 h-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary z-10" />
+        {/* Inner circle background for selected area */}
+        <div className="absolute inset-[15%] rounded-full bg-muted/30" />
+        
+        {/* Clock Center Dot */}
+        <div className="absolute top-1/2 left-1/2 w-2 h-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary z-20" />
 
         {/* Clock Hand */}
         <div
-          className="absolute top-1/2 left-1/2 origin-bottom transition-transform duration-150"
+          className="absolute top-1/2 left-1/2 origin-center transition-transform duration-150 z-10"
           style={{
             width: '2px',
-            height: mode === 'hour' ? '70px' : '85px',
+            height: '35%',
             backgroundColor: 'hsl(var(--primary))',
-            transform: `translateX(-50%) translateY(-100%) rotate(${handAngle}deg)`,
+            transform: `translate(-50%, -100%) rotate(${handAngle}deg)`,
             transformOrigin: 'bottom center',
           }}
         >
-          <div 
-            className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-primary"
-          />
+          {/* Hand tip circle */}
+          <div className="absolute -top-5 left-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-primary" />
         </div>
 
         {/* Hour Numbers or Minute Numbers */}
         {mode === 'hour' ? (
-          hours.map((h) => {
-            const pos = getPosition(h, 12, 85);
-            const isSelected = parseInt(hour) === h;
+          hours.map((h, index) => {
+            const pos = getPosition(index === 0 ? 12 : index, 12);
+            const isSelected = parseInt(hour) === h || (parseInt(hour) === 0 && h === 12);
             return (
               <button
                 key={h}
                 onClick={(e) => {
                   e.stopPropagation();
                   onHourChange(h.toString());
-                  setMode('minute');
+                  setTimeout(() => setMode('minute'), 200);
                 }}
                 className={cn(
-                  "absolute w-8 h-8 flex items-center justify-center rounded-full text-sm font-medium transition-colors",
-                  isSelected ? "text-primary-foreground" : "text-foreground hover:bg-accent"
+                  "absolute w-10 h-10 flex items-center justify-center rounded-full text-base font-medium transition-all z-30",
+                  isSelected ? "text-primary-foreground" : "text-foreground hover:bg-accent/50"
                 )}
                 style={{
-                  left: `calc(50% + ${pos.x}px - 16px)`,
-                  top: `calc(50% + ${pos.y}px - 16px)`,
+                  left: `calc(50% + ${pos.x}% - 20px)`,
+                  top: `calc(50% + ${pos.y}% - 20px)`,
                 }}
               >
                 {h}
@@ -171,7 +174,7 @@ export const ClockTimePicker = ({
           })
         ) : (
           minutes.map((m) => {
-            const pos = getPosition(m, 60, 85);
+            const pos = getPosition(m, 60);
             const isSelected = parseInt(minute) === m;
             return (
               <button
@@ -181,12 +184,12 @@ export const ClockTimePicker = ({
                   onMinuteChange(m.toString().padStart(2, '0'));
                 }}
                 className={cn(
-                  "absolute w-8 h-8 flex items-center justify-center rounded-full text-sm font-medium transition-colors",
-                  isSelected ? "text-primary-foreground" : "text-foreground hover:bg-accent"
+                  "absolute w-10 h-10 flex items-center justify-center rounded-full text-base font-medium transition-all z-30",
+                  isSelected ? "text-primary-foreground" : "text-foreground hover:bg-accent/50"
                 )}
                 style={{
-                  left: `calc(50% + ${pos.x}px - 16px)`,
-                  top: `calc(50% + ${pos.y}px - 16px)`,
+                  left: `calc(50% + ${pos.x}% - 20px)`,
+                  top: `calc(50% + ${pos.y}% - 20px)`,
                 }}
               >
                 {m.toString().padStart(2, '0')}
