@@ -189,35 +189,34 @@ export const TaskItem = ({
                 className="flex-1 min-w-0 overflow-hidden mr-2"
                 onClick={(e) => { e.stopPropagation(); if (!isSelectionMode && !isSwiping) onTaskClick(item); }}
               >
-                <div className="flex items-center gap-2">
-                  {item.voiceRecording && (
-                    <Mic className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-                  )}
-                  <p className={cn("text-sm font-medium truncate", item.completed && "text-muted-foreground")}>{item.text}</p>
-                  {item.repeatType && item.repeatType !== 'none' && <Repeat className="h-3 w-3 text-purple-500 flex-shrink-0" />}
-                </div>
-                {/* Voice recording indicator */}
-                {item.voiceRecording && (
-                  <div className="flex items-center gap-1.5 mt-1">
+                {/* Show voice player OR text based on whether it's a voice task */}
+                {item.voiceRecording ? (
+                  <div className="flex items-center gap-2">
                     <button
                       onClick={handlePlayVoice}
-                      className="flex items-center gap-2 px-2 py-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
                     >
                       {isPlayingVoice ? (
-                        <Pause className="h-3 w-3 text-primary flex-shrink-0" />
+                        <Pause className="h-4 w-4 text-primary flex-shrink-0" />
                       ) : (
-                        <Play className="h-3 w-3 text-primary flex-shrink-0" />
+                        <Play className="h-4 w-4 text-primary flex-shrink-0" />
                       )}
                       <WaveformVisualizer 
                         isActive={isPlayingVoice} 
-                        barCount={10}
+                        barCount={16}
                         color="hsl(var(--primary))"
-                        className="h-4"
+                        className="h-5 w-20"
                       />
-                      <span className="text-[10px] text-primary font-medium">
+                      <span className="text-xs text-primary font-medium">
                         {formatDuration(item.voiceRecording.duration)}
                       </span>
                     </button>
+                    {item.repeatType && item.repeatType !== 'none' && <Repeat className="h-3 w-3 text-purple-500 flex-shrink-0" />}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <p className={cn("text-sm font-medium truncate", item.completed && "text-muted-foreground")}>{item.text}</p>
+                    {item.repeatType && item.repeatType !== 'none' && <Repeat className="h-3 w-3 text-purple-500 flex-shrink-0" />}
                   </div>
                 )}
                 {/* Colored tags display */}
