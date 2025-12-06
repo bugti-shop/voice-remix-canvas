@@ -483,15 +483,12 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
   return (
     <>
       <div
-        className="fixed inset-0 bg-black/20 z-40 animate-fade-in"
+        className="fixed inset-0 bg-black/20 z-40"
         onClick={onClose}
       />
 
       <div
-        className={cn(
-          "fixed bottom-0 left-0 right-0 bg-card z-50 rounded-t-[28px] shadow-2xl transition-all duration-500 ease-out pointer-events-auto",
-          isOpen ? "translate-y-0 scale-100 opacity-100" : "translate-y-full scale-95 opacity-0"
-        )}
+        className="fixed bottom-0 left-0 right-0 bg-card z-50 rounded-t-[28px] shadow-2xl pointer-events-auto"
         style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 24px)' }}
         onClick={(e) => e.stopPropagation()}
       >
