@@ -345,284 +345,326 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
           )}
 
           <div className="flex items-center gap-2 flex-wrap">
-            <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
-              <PopoverTrigger asChild>
-                <button
-                  className={cn(
-                    "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
-                    dueDate ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30" : "border-border bg-card hover:bg-muted"
-                  )}
-                >
-                  {dueDate && <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full" />}
-                  {dueDate ? (
-                    <CalendarCheck className="h-4 w-4 text-blue-500" />
-                  ) : (
-                    <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                  )}
-                  <span className={cn("text-sm", dueDate ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground")}>
-                    {dueDate ? format(dueDate, 'MMM d') : 'Date'}
-                  </span>
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 bg-popover z-50" align="start">
-                <div className="p-3 space-y-2">
-                  <div className="space-y-1">
-                    <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => handleQuickDate('today')}>Today</Button>
-                    <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => handleQuickDate('tomorrow')}>Tomorrow</Button>
-                    <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => handleQuickDate('weekend')}>This Weekend</Button>
-                    <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => handleQuickDate('nextweek')}>Next Week</Button>
-                  </div>
-                  <Separator />
-                  <Calendar
-                    mode="single"
-                    selected={dueDate}
-                    onSelect={(date) => {
-                      setDueDate(date);
-                      setShowDatePicker(false);
-                    }}
-                  />
-                </div>
-              </PopoverContent>
-            </Popover>
-
-            <Popover open={showPriorityMenu} onOpenChange={setShowPriorityMenu}>
-              <PopoverTrigger asChild>
-                <button className={cn(
-                  "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
-                  priority === 'high' ? "border-red-500 bg-red-50 dark:bg-red-950/30" :
-                  priority === 'medium' ? "border-orange-500 bg-orange-50 dark:bg-orange-950/30" :
-                  priority === 'low' ? "border-green-500 bg-green-50 dark:bg-green-950/30" :
-                  "border-border bg-card hover:bg-muted"
-                )}>
-                  {priority !== 'none' && (
-                    <span className={cn(
-                      "absolute -top-1 -right-1 w-2 h-2 rounded-full",
-                      priority === 'high' ? 'bg-red-500' :
-                      priority === 'medium' ? 'bg-orange-500' :
-                      'bg-green-500'
-                    )} />
-                  )}
-                  <Flag className={cn("h-4 w-4", 
-                    priority === 'high' ? 'text-red-500 fill-red-500' : 
-                    priority === 'medium' ? 'text-orange-500 fill-orange-500' : 
-                    priority === 'low' ? 'text-green-500 fill-green-500' : 
-                    'text-muted-foreground'
-                  )} />
-                  <span className={cn("text-sm",
-                    priority === 'high' ? 'text-red-600 dark:text-red-400' : 
-                    priority === 'medium' ? 'text-orange-600 dark:text-orange-400' : 
-                    priority === 'low' ? 'text-green-600 dark:text-green-400' : 
-                    'text-muted-foreground'
-                  )}>
-                    {priority !== 'none' ? (priority.charAt(0).toUpperCase() + priority.slice(1)) : 'Priority'}
-                  </span>
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-48 p-2 bg-popover z-50" align="start">
-                <div className="space-y-1">
-                  <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => { setPriority('high'); setShowPriorityMenu(false); }}>
-                    <Flag className="h-4 w-4 mr-2 text-red-500 fill-red-500" />High Priority
-                  </Button>
-                  <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => { setPriority('medium'); setShowPriorityMenu(false); }}>
-                    <Flag className="h-4 w-4 mr-2 text-orange-500 fill-orange-500" />Medium Priority
-                  </Button>
-                  <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => { setPriority('low'); setShowPriorityMenu(false); }}>
-                    <Flag className="h-4 w-4 mr-2 text-green-500 fill-green-500" />Low Priority
-                  </Button>
-                  <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => { setPriority('none'); setShowPriorityMenu(false); }}>
-                    <Flag className="h-4 w-4 mr-2 text-gray-400" />No Priority
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
-
-            <button
-              className={cn(
-                "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
-                reminderTime ? "border-purple-500 bg-purple-50 dark:bg-purple-950/30" : "border-border bg-card hover:bg-muted"
-              )}
-              onClick={() => setShowTimePicker(true)}
-            >
-              {reminderTime && <span className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full" />}
-              {reminderTime ? (
-                <BellRing className="h-4 w-4 text-purple-500 fill-purple-500" />
-              ) : (
-                <Timer className="h-4 w-4 text-muted-foreground" />
-              )}
-              <span className={cn("text-sm", reminderTime ? "text-purple-600 dark:text-purple-400" : "text-muted-foreground")}>
-                {reminderTime ? format(reminderTime, 'h:mm a') : 'Reminders'}
-              </span>
-            </button>
-
-            {/* Tag Button */}
-            <Popover open={showTagInput} onOpenChange={setShowTagInput}>
-              <PopoverTrigger asChild>
-                <button
-                  className={cn(
-                    "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
-                    coloredTags.length > 0 ? "border-teal-500 bg-teal-50 dark:bg-teal-950/30" : "border-border bg-card hover:bg-muted"
-                  )}
-                >
-                  {coloredTags.length > 0 && <span className="absolute -top-1 -right-1 w-2 h-2 bg-teal-500 rounded-full" />}
-                  <Tag className={cn("h-4 w-4", coloredTags.length > 0 ? "text-teal-500" : "text-muted-foreground")} />
-                  <span className={cn("text-sm", coloredTags.length > 0 ? "text-teal-600 dark:text-teal-400" : "text-muted-foreground")}>
-                    {coloredTags.length > 0 ? `${coloredTags.length} Tag${coloredTags.length > 1 ? 's' : ''}` : 'Tags'}
-                  </span>
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-72 p-3 bg-popover z-50" align="start">
-                <div className="space-y-3">
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Add a tag..."
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(); } }}
-                      className="h-9 text-sm flex-1"
-                    />
-                    <Button size="sm" onClick={handleAddTag} disabled={!tagInput.trim()}>Add</Button>
-                  </div>
-                  
-                  {/* Saved tag suggestions */}
-                  {savedTags.length > 0 && (
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs text-muted-foreground">Recent tags</p>
-                        <button
-                          onClick={() => setShowManageTags(true)}
-                          className="text-xs text-primary hover:underline"
-                        >
-                          Manage
-                        </button>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {savedTags
-                          .filter(st => !coloredTags.some(ct => ct.name === st.name))
-                          .slice(0, 6)
-                          .map((tag) => (
-                            <button
-                              key={tag.name}
-                              onClick={() => handleAddSavedTag(tag)}
-                              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full hover:opacity-80 transition-opacity"
-                              style={{ 
-                                backgroundColor: `${tag.color}20`, 
-                                color: tag.color 
-                              }}
-                            >
-                              <Tag className="h-3 w-3" />
-                              {tag.name}
-                            </button>
-                          ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-2">Tag color</p>
-                    <div className="flex gap-1.5 flex-wrap">
-                      {tagColors.map((color) => (
-                        <button
-                          key={color}
-                          onClick={() => setSelectedTagColor(color)}
-                          className={cn(
-                            "w-7 h-7 rounded-full transition-all",
-                            selectedTagColor === color && "ring-2 ring-offset-2 ring-primary"
-                          )}
-                          style={{ backgroundColor: color }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  {coloredTags.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 pt-2 border-t">
-                      {coloredTags.map((tag) => (
-                        <span 
-                          key={tag.name} 
-                          className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full"
-                          style={{ 
-                            backgroundColor: `${tag.color}20`, 
-                            color: tag.color 
-                          }}
-                        >
-                          {tag.name}
-                          <button onClick={() => handleRemoveTag(tag.name)}><X className="h-3 w-3" /></button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </PopoverContent>
-            </Popover>
-
-            {/* Deadline Button */}
-            <Popover open={showDeadlinePicker} onOpenChange={setShowDeadlinePicker}>
-              <PopoverTrigger asChild>
-                <button
-                  className={cn(
-                    "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
-                    deadline ? "border-rose-500 bg-rose-50 dark:bg-rose-950/30" : "border-border bg-card hover:bg-muted"
-                  )}
-                >
-                  {deadline && <span className="absolute -top-1 -right-1 w-2 h-2 bg-rose-500 rounded-full" />}
-                  <CalendarClock className={cn("h-4 w-4", deadline ? "text-rose-500" : "text-muted-foreground")} />
-                  <span className={cn("text-sm", deadline ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground")}>
-                    {deadline ? format(deadline, 'MMM d') : 'Deadline'}
-                  </span>
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 bg-popover z-50" align="start">
-                <Calendar
-                  mode="single"
-                  selected={deadline}
-                  onSelect={(date) => {
-                    setDeadline(date);
-                    setShowDeadlinePicker(false);
-                  }}
-                />
-                {deadline && (
-                  <div className="p-2 border-t">
-                    <Button variant="ghost" size="sm" className="w-full text-rose-500" onClick={() => { setDeadline(undefined); setShowDeadlinePicker(false); }}>
-                      <X className="h-4 w-4 mr-2" />Remove Deadline
-                    </Button>
-                  </div>
-                )}
-              </PopoverContent>
-            </Popover>
-
-            {/* Edit Actions Button */}
-            <button
-              className="relative flex items-center gap-1.5 px-3 py-2 rounded-md border border-border bg-card hover:bg-muted transition-all"
-              onClick={() => setShowEditActions(true)}
-            >
-              <Settings2 className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Edit Actions</span>
-            </button>
-
-            <Popover>
-              <PopoverTrigger asChild>
-                <button className="flex items-center justify-center w-8 h-8 rounded-md border border-border bg-card hover:bg-muted transition-all">
-                  <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-56 p-2 bg-popover z-50" align="end">
-                <div className="space-y-1">
-                  <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => setShowFolderDialog(true)}>
-                    <FolderIcon className="h-4 w-4 mr-2" />
-                    {folderId ? folders.find(f => f.id === folderId)?.name || 'Folder' : 'Add to Folder'}
-                  </Button>
-                  <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => imageInputRef.current?.click()}>
-                    <ImageIcon className="h-4 w-4 mr-2" />
-                    {imageUrl ? 'Image Added' : 'Add Image'}
-                  </Button>
-                  <Separator className="my-1" />
-                  <Popover open={showRepeatMenu} onOpenChange={setShowRepeatMenu}>
+            {/* Render action buttons in the order defined by actionItems */}
+            {actionItems.filter(a => a.enabled).map((action) => {
+              if (action.id === 'date') {
+                return (
+                  <Popover key={action.id} open={showDatePicker} onOpenChange={setShowDatePicker}>
                     <PopoverTrigger asChild>
-                      <Button variant="ghost" size="sm" className="w-full justify-start">
-                        <Repeat className={cn("h-4 w-4 mr-2", repeatType !== 'none' ? "text-purple-500" : "")} />
-                        {repeatType !== 'none' ? getRepeatLabel() : 'Set Repeat'}
-                      </Button>
+                      <button
+                        className={cn(
+                          "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
+                          dueDate ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30" : "border-border bg-card hover:bg-muted"
+                        )}
+                      >
+                        {dueDate && <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full" />}
+                        {dueDate ? (
+                          <CalendarCheck className="h-4 w-4 text-blue-500" />
+                        ) : (
+                          <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <span className={cn("text-sm", dueDate ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground")}>
+                          {dueDate ? format(dueDate, 'MMM d') : 'Date'}
+                        </span>
+                      </button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-56 p-2 bg-popover z-50" align="start" side="left">
+                    <PopoverContent className="w-auto p-0 bg-popover z-50" align="start">
+                      <div className="p-3 space-y-2">
+                        <div className="space-y-1">
+                          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => handleQuickDate('today')}>Today</Button>
+                          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => handleQuickDate('tomorrow')}>Tomorrow</Button>
+                          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => handleQuickDate('weekend')}>This Weekend</Button>
+                          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => handleQuickDate('nextweek')}>Next Week</Button>
+                        </div>
+                        <Separator />
+                        <Calendar
+                          mode="single"
+                          selected={dueDate}
+                          onSelect={(date) => {
+                            setDueDate(date);
+                            setShowDatePicker(false);
+                          }}
+                        />
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                );
+              }
+
+              if (action.id === 'priority') {
+                return (
+                  <Popover key={action.id} open={showPriorityMenu} onOpenChange={setShowPriorityMenu}>
+                    <PopoverTrigger asChild>
+                      <button className={cn(
+                        "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
+                        priority === 'high' ? "border-red-500 bg-red-50 dark:bg-red-950/30" :
+                        priority === 'medium' ? "border-orange-500 bg-orange-50 dark:bg-orange-950/30" :
+                        priority === 'low' ? "border-green-500 bg-green-50 dark:bg-green-950/30" :
+                        "border-border bg-card hover:bg-muted"
+                      )}>
+                        {priority !== 'none' && (
+                          <span className={cn(
+                            "absolute -top-1 -right-1 w-2 h-2 rounded-full",
+                            priority === 'high' ? 'bg-red-500' :
+                            priority === 'medium' ? 'bg-orange-500' :
+                            'bg-green-500'
+                          )} />
+                        )}
+                        <Flag className={cn("h-4 w-4", 
+                          priority === 'high' ? 'text-red-500 fill-red-500' : 
+                          priority === 'medium' ? 'text-orange-500 fill-orange-500' : 
+                          priority === 'low' ? 'text-green-500 fill-green-500' : 
+                          'text-muted-foreground'
+                        )} />
+                        <span className={cn("text-sm",
+                          priority === 'high' ? 'text-red-600 dark:text-red-400' : 
+                          priority === 'medium' ? 'text-orange-600 dark:text-orange-400' : 
+                          priority === 'low' ? 'text-green-600 dark:text-green-400' : 
+                          'text-muted-foreground'
+                        )}>
+                          {priority !== 'none' ? (priority.charAt(0).toUpperCase() + priority.slice(1)) : 'Priority'}
+                        </span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-48 p-2 bg-popover z-50" align="start">
+                      <div className="space-y-1">
+                        <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => { setPriority('high'); setShowPriorityMenu(false); }}>
+                          <Flag className="h-4 w-4 mr-2 text-red-500 fill-red-500" />High Priority
+                        </Button>
+                        <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => { setPriority('medium'); setShowPriorityMenu(false); }}>
+                          <Flag className="h-4 w-4 mr-2 text-orange-500 fill-orange-500" />Medium Priority
+                        </Button>
+                        <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => { setPriority('low'); setShowPriorityMenu(false); }}>
+                          <Flag className="h-4 w-4 mr-2 text-green-500 fill-green-500" />Low Priority
+                        </Button>
+                        <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => { setPriority('none'); setShowPriorityMenu(false); }}>
+                          <Flag className="h-4 w-4 mr-2 text-gray-400" />No Priority
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                );
+              }
+
+              if (action.id === 'reminder') {
+                return (
+                  <button
+                    key={action.id}
+                    className={cn(
+                      "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
+                      reminderTime ? "border-purple-500 bg-purple-50 dark:bg-purple-950/30" : "border-border bg-card hover:bg-muted"
+                    )}
+                    onClick={() => setShowTimePicker(true)}
+                  >
+                    {reminderTime && <span className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full" />}
+                    {reminderTime ? (
+                      <BellRing className="h-4 w-4 text-purple-500 fill-purple-500" />
+                    ) : (
+                      <Timer className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <span className={cn("text-sm", reminderTime ? "text-purple-600 dark:text-purple-400" : "text-muted-foreground")}>
+                      {reminderTime ? format(reminderTime, 'h:mm a') : 'Reminders'}
+                    </span>
+                  </button>
+                );
+              }
+
+              if (action.id === 'tags') {
+                return (
+                  <Popover key={action.id} open={showTagInput} onOpenChange={setShowTagInput}>
+                    <PopoverTrigger asChild>
+                      <button
+                        className={cn(
+                          "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
+                          coloredTags.length > 0 ? "border-teal-500 bg-teal-50 dark:bg-teal-950/30" : "border-border bg-card hover:bg-muted"
+                        )}
+                      >
+                        {coloredTags.length > 0 && <span className="absolute -top-1 -right-1 w-2 h-2 bg-teal-500 rounded-full" />}
+                        <Tag className={cn("h-4 w-4", coloredTags.length > 0 ? "text-teal-500" : "text-muted-foreground")} />
+                        <span className={cn("text-sm", coloredTags.length > 0 ? "text-teal-600 dark:text-teal-400" : "text-muted-foreground")}>
+                          {coloredTags.length > 0 ? `${coloredTags.length} Tag${coloredTags.length > 1 ? 's' : ''}` : 'Tags'}
+                        </span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-72 p-3 bg-popover z-50" align="start">
+                      <div className="space-y-3">
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Add a tag..."
+                            value={tagInput}
+                            onChange={(e) => setTagInput(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(); } }}
+                            className="h-9 text-sm flex-1"
+                          />
+                          <Button size="sm" onClick={handleAddTag} disabled={!tagInput.trim()}>Add</Button>
+                        </div>
+                        
+                        {savedTags.length > 0 && (
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-xs text-muted-foreground">Recent tags</p>
+                              <button
+                                onClick={() => setShowManageTags(true)}
+                                className="text-xs text-primary hover:underline"
+                              >
+                                Manage
+                              </button>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {savedTags
+                                .filter(st => !coloredTags.some(ct => ct.name === st.name))
+                                .slice(0, 6)
+                                .map((tag) => (
+                                  <button
+                                    key={tag.name}
+                                    onClick={() => handleAddSavedTag(tag)}
+                                    className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full hover:opacity-80 transition-opacity"
+                                    style={{ 
+                                      backgroundColor: `${tag.color}20`, 
+                                      color: tag.color 
+                                    }}
+                                  >
+                                    <Tag className="h-3 w-3" />
+                                    {tag.name}
+                                  </button>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-2">Tag color</p>
+                          <div className="flex gap-1.5 flex-wrap">
+                            {tagColors.map((color) => (
+                              <button
+                                key={color}
+                                onClick={() => setSelectedTagColor(color)}
+                                className={cn(
+                                  "w-7 h-7 rounded-full transition-all",
+                                  selectedTagColor === color && "ring-2 ring-offset-2 ring-primary"
+                                )}
+                                style={{ backgroundColor: color }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        {coloredTags.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 pt-2 border-t">
+                            {coloredTags.map((tag) => (
+                              <span 
+                                key={tag.name} 
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full"
+                                style={{ 
+                                  backgroundColor: `${tag.color}20`, 
+                                  color: tag.color 
+                                }}
+                              >
+                                {tag.name}
+                                <button onClick={() => handleRemoveTag(tag.name)}><X className="h-3 w-3" /></button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                );
+              }
+
+              if (action.id === 'deadline') {
+                return (
+                  <Popover key={action.id} open={showDeadlinePicker} onOpenChange={setShowDeadlinePicker}>
+                    <PopoverTrigger asChild>
+                      <button
+                        className={cn(
+                          "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
+                          deadline ? "border-rose-500 bg-rose-50 dark:bg-rose-950/30" : "border-border bg-card hover:bg-muted"
+                        )}
+                      >
+                        {deadline && <span className="absolute -top-1 -right-1 w-2 h-2 bg-rose-500 rounded-full" />}
+                        <CalendarClock className={cn("h-4 w-4", deadline ? "text-rose-500" : "text-muted-foreground")} />
+                        <span className={cn("text-sm", deadline ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground")}>
+                          {deadline ? format(deadline, 'MMM d') : 'Deadline'}
+                        </span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 bg-popover z-50" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={deadline}
+                        onSelect={(date) => {
+                          setDeadline(date);
+                          setShowDeadlinePicker(false);
+                        }}
+                      />
+                      {deadline && (
+                        <div className="p-2 border-t">
+                          <Button variant="ghost" size="sm" className="w-full text-rose-500" onClick={() => { setDeadline(undefined); setShowDeadlinePicker(false); }}>
+                            <X className="h-4 w-4 mr-2" />Remove Deadline
+                          </Button>
+                        </div>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+                );
+              }
+
+              if (action.id === 'folder') {
+                return (
+                  <button
+                    key={action.id}
+                    className={cn(
+                      "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
+                      folderId ? "border-amber-500 bg-amber-50 dark:bg-amber-950/30" : "border-border bg-card hover:bg-muted"
+                    )}
+                    onClick={() => setShowFolderDialog(true)}
+                  >
+                    {folderId && <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full" />}
+                    <FolderIcon className={cn("h-4 w-4", folderId ? "text-amber-500" : "text-muted-foreground")} />
+                    <span className={cn("text-sm", folderId ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground")}>
+                      {folderId ? folders.find(f => f.id === folderId)?.name || 'Folder' : 'Folder'}
+                    </span>
+                  </button>
+                );
+              }
+
+              if (action.id === 'image') {
+                return (
+                  <button
+                    key={action.id}
+                    className={cn(
+                      "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
+                      imageUrl ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30" : "border-border bg-card hover:bg-muted"
+                    )}
+                    onClick={() => imageInputRef.current?.click()}
+                  >
+                    {imageUrl && <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full" />}
+                    <ImageIcon className={cn("h-4 w-4", imageUrl ? "text-emerald-500" : "text-muted-foreground")} />
+                    <span className={cn("text-sm", imageUrl ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")}>
+                      {imageUrl ? 'Image Added' : 'Image'}
+                    </span>
+                  </button>
+                );
+              }
+
+              if (action.id === 'repeat') {
+                return (
+                  <Popover key={action.id} open={showRepeatMenu} onOpenChange={setShowRepeatMenu}>
+                    <PopoverTrigger asChild>
+                      <button
+                        className={cn(
+                          "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
+                          repeatType !== 'none' ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30" : "border-border bg-card hover:bg-muted"
+                        )}
+                      >
+                        {repeatType !== 'none' && <span className="absolute -top-1 -right-1 w-2 h-2 bg-indigo-500 rounded-full" />}
+                        <Repeat className={cn("h-4 w-4", repeatType !== 'none' ? "text-indigo-500" : "text-muted-foreground")} />
+                        <span className={cn("text-sm", repeatType !== 'none' ? "text-indigo-600 dark:text-indigo-400" : "text-muted-foreground")}>
+                          {repeatType !== 'none' ? getRepeatLabel() : 'Repeat'}
+                        </span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-56 p-2 bg-popover z-50" align="start">
                       {dueDate ? (
                         <div className="space-y-1">
                           <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => { setRepeatType('daily'); setShowRepeatMenu(false); }}>
@@ -648,9 +690,20 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
                       )}
                     </PopoverContent>
                   </Popover>
-                </div>
-              </PopoverContent>
-            </Popover>
+                );
+              }
+
+              return null;
+            })}
+
+            {/* Edit Actions Button - always last */}
+            <button
+              className="relative flex items-center gap-1.5 px-3 py-2 rounded-md border border-border bg-card hover:bg-muted transition-all"
+              onClick={() => setShowEditActions(true)}
+            >
+              <Settings2 className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Edit Actions</span>
+            </button>
 
             <input
               ref={imageInputRef}
