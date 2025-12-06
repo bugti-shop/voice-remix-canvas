@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { format, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths } from 'date-fns';
+import { format, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, addDays, startOfWeek, addWeeks } from 'date-fns';
 import { ChevronLeft, ChevronRight, X, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -177,8 +177,58 @@ export const TaskDateTimePage = ({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
+        {/* Quick Date Buttons */}
+        <div className="px-6 pt-4 pb-2">
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            <button
+              onClick={() => setSelectedDate(today)}
+              className={cn(
+                "px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap",
+                selectedDate && isSameDay(selectedDate, today)
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              )}
+            >
+              Today
+            </button>
+            <button
+              onClick={() => setSelectedDate(addDays(today, 1))}
+              className={cn(
+                "px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap",
+                selectedDate && isSameDay(selectedDate, addDays(today, 1))
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              )}
+            >
+              Tomorrow
+            </button>
+            <button
+              onClick={() => setSelectedDate(startOfWeek(addWeeks(today, 1), { weekStartsOn: 6 }))}
+              className={cn(
+                "px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap",
+                selectedDate && isSameDay(selectedDate, startOfWeek(addWeeks(today, 1), { weekStartsOn: 6 }))
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              )}
+            >
+              This Weekend
+            </button>
+            <button
+              onClick={() => setSelectedDate(addWeeks(today, 1))}
+              className={cn(
+                "px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap",
+                selectedDate && isSameDay(selectedDate, addWeeks(today, 1))
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              )}
+            >
+              Next Week
+            </button>
+          </div>
+        </div>
+
         {/* Calendar Section */}
-        <div className="p-6 bg-card">
+        <div className="px-6 pb-6 bg-card">
           <div className="flex items-center justify-between mb-6">
             <button
               onClick={handlePrevMonth}
