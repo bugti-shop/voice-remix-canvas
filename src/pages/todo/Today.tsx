@@ -313,6 +313,15 @@ const Today = () => {
     setStatusFilter('all');
   };
 
+  const getPriorityBorderColor = (priority?: Priority) => {
+    switch (priority) {
+      case 'high': return 'border-red-500';
+      case 'medium': return 'border-orange-500';
+      case 'low': return 'border-green-500';
+      default: return 'border-primary';
+    }
+  };
+
   const renderTaskItem = (item: TodoItem) => (
     viewMode === 'flat' ? (
       <div key={item.id} className="flex items-center gap-3 py-2 px-1 border-b border-border/50">
@@ -327,7 +336,12 @@ const Today = () => {
             }
             updateItem(item.id, { completed: !!checked });
           }}
-          className={cn("h-5 w-5", item.completed && "border-muted-foreground/50")}
+          className={cn(
+            "h-5 w-5 rounded-sm border-2",
+            item.completed 
+              ? "border-muted-foreground/50" 
+              : getPriorityBorderColor(item.priority)
+          )}
         />
         <span className={cn("flex-1 text-sm", item.completed && "text-muted-foreground")} onClick={() => setSelectedTask(item)}>
           {item.text}
