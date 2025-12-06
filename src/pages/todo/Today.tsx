@@ -6,7 +6,7 @@ import { Plus, FolderIcon, ChevronRight, ChevronDown, MoreVertical, Eye, EyeOff,
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { TaskInputSheet } from '@/components/TaskInputSheet';
-import { TaskDetailSheet } from '@/components/TaskDetailSheet';
+import { TaskDetailPage } from '@/components/TaskDetailPage';
 import { TaskItem } from '@/components/TaskItem';
 import { TaskFilterSheet, DateFilter, PriorityFilter, StatusFilter } from '@/components/TaskFilterSheet';
 import { DuplicateOptionsSheet, DuplicateOption } from '@/components/DuplicateOptionsSheet';
@@ -253,6 +253,15 @@ const Today = () => {
     setSelectedTaskIds(new Set());
     setIsSelectionMode(false);
     toast.success(`Converted ${tasksToConvert.length} task(s) to notes`);
+  };
+
+  const handleConvertSingleTask = (task: TodoItem) => {
+    convertToNotes([task]);
+  };
+
+  const handleMoveTaskToFolder = (taskId: string, folderId: string | null) => {
+    setItems(items.map(i => i.id === taskId ? { ...i, folderId: folderId || undefined } : i));
+    toast.success('Task moved');
   };
 
   const processedItems = useMemo(() => {
@@ -640,7 +649,17 @@ const Today = () => {
       </Button>
 
       <TaskInputSheet isOpen={isInputOpen} onClose={() => setIsInputOpen(false)} onAddTask={handleAddTask} folders={folders} selectedFolderId={selectedFolderId} onCreateFolder={handleCreateFolder} />
-      <TaskDetailSheet isOpen={!!selectedTask} task={selectedTask} onClose={() => setSelectedTask(null)} onUpdate={(updatedTask) => { updateItem(updatedTask.id, updatedTask); setSelectedTask(updatedTask); }} onDelete={deleteItem} onDuplicate={duplicateTask} />
+      <TaskDetailPage 
+        isOpen={!!selectedTask} 
+        task={selectedTask} 
+        folders={folders}
+        onClose={() => setSelectedTask(null)} 
+        onUpdate={(updatedTask) => { updateItem(updatedTask.id, updatedTask); setSelectedTask(updatedTask); }} 
+        onDelete={deleteItem} 
+        onDuplicate={duplicateTask}
+        onConvertToNote={handleConvertSingleTask}
+        onMoveToFolder={handleMoveTaskToFolder}
+      />
       <TaskFilterSheet isOpen={isFilterSheetOpen} onClose={() => setIsFilterSheetOpen(false)} folders={folders} selectedFolderId={selectedFolderId} onFolderChange={setSelectedFolderId} dateFilter={dateFilter} onDateFilterChange={setDateFilter} priorityFilter={priorityFilter} onPriorityFilterChange={setPriorityFilter} statusFilter={statusFilter} onStatusFilterChange={setStatusFilter} selectedTags={tagFilter} onTagsChange={setTagFilter} onClearAll={handleClearFilters} />
       <DuplicateOptionsSheet isOpen={isDuplicateSheetOpen} onClose={() => setIsDuplicateSheetOpen(false)} onSelect={handleDuplicate} />
       <FolderManageSheet isOpen={isFolderManageOpen} onClose={() => setIsFolderManageOpen(false)} folders={folders} onCreateFolder={handleCreateFolder} onEditFolder={handleEditFolder} onDeleteFolder={handleDeleteFolder} />
