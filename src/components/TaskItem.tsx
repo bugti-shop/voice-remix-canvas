@@ -137,13 +137,14 @@ export const TaskItem = ({
                 <Checkbox
                   checked={item.completed}
                   onCheckedChange={async (checked) => {
+                    // Update immediately for instant visual feedback
+                    onUpdate(item.id, { completed: !!checked });
                     if (checked && !item.completed) {
                       try {
                         await Haptics.impact({ style: ImpactStyle.Heavy });
                         setTimeout(async () => { try { await Haptics.impact({ style: ImpactStyle.Medium }); } catch {} }, 100);
                       } catch {}
                     }
-                    onUpdate(item.id, { completed: !!checked });
                   }}
                   onClick={(e) => e.stopPropagation()}
                   className={cn(
