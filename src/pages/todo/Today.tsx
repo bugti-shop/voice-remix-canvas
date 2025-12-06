@@ -944,7 +944,7 @@ const Today = () => {
         <Plus className="h-5 w-5" />Add Task
       </Button>
 
-      <TaskInputSheet isOpen={isInputOpen} onClose={() => { setIsInputOpen(false); setInputSectionId(null); }} onAddTask={handleAddTask} folders={folders} selectedFolderId={selectedFolderId} onCreateFolder={handleCreateFolder} />
+      <TaskInputSheet isOpen={isInputOpen} onClose={() => { setIsInputOpen(false); setInputSectionId(null); }} onAddTask={handleAddTask} folders={folders} selectedFolderId={selectedFolderId} onCreateFolder={handleCreateFolder} sections={sections} selectedSectionId={inputSectionId} />
       <TaskDetailPage 
         isOpen={!!selectedTask} 
         task={selectedTask} 

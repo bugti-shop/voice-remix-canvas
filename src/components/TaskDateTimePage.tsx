@@ -37,6 +37,7 @@ interface TaskDateTimePageProps {
   initialTime?: { hour: number; minute: number; period: 'AM' | 'PM' };
   initialReminder?: string;
   initialRepeatSettings?: RepeatSettings;
+  hideRepeat?: boolean;
 }
 
 export const TaskDateTimePage = ({
@@ -47,6 +48,7 @@ export const TaskDateTimePage = ({
   initialTime,
   initialReminder,
   initialRepeatSettings,
+  hideRepeat = false,
 }: TaskDateTimePageProps) => {
   const today = new Date();
   const [currentMonthOffset, setCurrentMonthOffset] = useState(0);
@@ -337,194 +339,196 @@ export const TaskDateTimePage = ({
           </Select>
         </div>
 
-        {/* Repeat Section */}
-        <div className="px-6 py-4 border-t border-border">
-          <h4 className="text-sm font-medium mb-4">Set as Repeat Task</h4>
-          
-          {/* Frequency Tabs */}
-          <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-            {(['hour', 'daily', 'weekly', 'monthly', 'yearly'] as RepeatFrequency[]).map((freq) => (
-              <button
-                key={freq}
-                onClick={() => setRepeatFrequency(repeatFrequency === freq ? null : freq)}
-                className={cn(
-                  "px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap",
-                  repeatFrequency === freq
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                )}
-              >
-                {freq.charAt(0).toUpperCase() + freq.slice(1)}
-              </button>
-            ))}
-          </div>
+        {/* Repeat Section - only show if hideRepeat is false */}
+        {!hideRepeat && (
+          <div className="px-6 py-4 border-t border-border">
+            <h4 className="text-sm font-medium mb-4">Set as Repeat Task</h4>
+            
+            {/* Frequency Tabs */}
+            <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+              {(['hour', 'daily', 'weekly', 'monthly', 'yearly'] as RepeatFrequency[]).map((freq) => (
+                <button
+                  key={freq}
+                  onClick={() => setRepeatFrequency(repeatFrequency === freq ? null : freq)}
+                  className={cn(
+                    "px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap",
+                    repeatFrequency === freq
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  )}
+                >
+                  {freq.charAt(0).toUpperCase() + freq.slice(1)}
+                </button>
+              ))}
+            </div>
 
-          {/* Repeat Options */}
-          {repeatFrequency && (
-            <div className="space-y-4 animate-in slide-in-from-top-2">
-              {/* Repeat Every */}
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Repeat Every</span>
-                <Select value={repeatInterval} onValueChange={setRepeatInterval}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover max-h-60">
-                    {repeatFrequency === 'hour' && (
-                      Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
-                        <SelectItem key={n} value={n.toString()}>
-                          {n} hour{n > 1 ? 's' : ''}
-                        </SelectItem>
-                      ))
-                    )}
-                    {repeatFrequency === 'daily' && (
-                      Array.from({ length: 30 }, (_, i) => i + 1).map((n) => (
-                        <SelectItem key={n} value={n.toString()}>
-                          {n} day{n > 1 ? 's' : ''}
-                        </SelectItem>
-                      ))
-                    )}
-                    {repeatFrequency === 'weekly' && (
-                      Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
-                        <SelectItem key={n} value={n.toString()}>
-                          {n} week{n > 1 ? 's' : ''}
-                        </SelectItem>
-                      ))
-                    )}
-                    {repeatFrequency === 'monthly' && (
-                      Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
-                        <SelectItem key={n} value={n.toString()}>
-                          {n} month{n > 1 ? 's' : ''}
-                        </SelectItem>
-                      ))
-                    )}
-                    {repeatFrequency === 'yearly' && (
-                      Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-                        <SelectItem key={n} value={n.toString()}>
-                          {n} year{n > 1 ? 's' : ''}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Weekly: Repeat On Days */}
-              {repeatFrequency === 'weekly' && (
-                <div className="space-y-2">
-                  <span className="text-sm">Repeat on</span>
-                  <div className="flex gap-2 flex-wrap">
-                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
-                      <button
-                        key={day}
-                        onClick={() => toggleWeeklyDay(index)}
-                        className={cn(
-                          "w-10 h-10 rounded-full text-xs font-medium transition-colors",
-                          weeklyDays.includes(index)
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground hover:bg-muted/80"
-                        )}
-                      >
-                        {day}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Monthly: Repeat On Day */}
-              {repeatFrequency === 'monthly' && (
+            {/* Repeat Options */}
+            {repeatFrequency && (
+              <div className="space-y-4 animate-in slide-in-from-top-2">
+                {/* Repeat Every */}
                 <div className="flex items-center justify-between">
-                  <span className="text-sm">Repeat on</span>
-                  <Select value={monthlyDay} onValueChange={setMonthlyDay}>
+                  <span className="text-sm">Repeat Every</span>
+                  <Select value={repeatInterval} onValueChange={setRepeatInterval}>
                     <SelectTrigger className="w-32">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-popover max-h-60">
-                      {Array.from({ length: 30 }, (_, i) => i + 1).map((n) => (
-                        <SelectItem key={n} value={n.toString()}>
-                          Day {n}
-                        </SelectItem>
-                      ))}
+                      {repeatFrequency === 'hour' && (
+                        Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
+                          <SelectItem key={n} value={n.toString()}>
+                            {n} hour{n > 1 ? 's' : ''}
+                          </SelectItem>
+                        ))
+                      )}
+                      {repeatFrequency === 'daily' && (
+                        Array.from({ length: 30 }, (_, i) => i + 1).map((n) => (
+                          <SelectItem key={n} value={n.toString()}>
+                            {n} day{n > 1 ? 's' : ''}
+                          </SelectItem>
+                        ))
+                      )}
+                      {repeatFrequency === 'weekly' && (
+                        Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
+                          <SelectItem key={n} value={n.toString()}>
+                            {n} week{n > 1 ? 's' : ''}
+                          </SelectItem>
+                        ))
+                      )}
+                      {repeatFrequency === 'monthly' && (
+                        Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
+                          <SelectItem key={n} value={n.toString()}>
+                            {n} month{n > 1 ? 's' : ''}
+                          </SelectItem>
+                        ))
+                      )}
+                      {repeatFrequency === 'yearly' && (
+                        Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                          <SelectItem key={n} value={n.toString()}>
+                            {n} year{n > 1 ? 's' : ''}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
-              )}
 
-              {/* Repeat Ends At */}
-              <div className="space-y-3">
-                <span className="text-sm">Repeat Ends at</span>
-                <Select value={repeatEndsType} onValueChange={(v) => setRepeatEndsType(v as RepeatEndsType)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover">
-                    <SelectItem value="never">Never</SelectItem>
-                    <SelectItem value="on_date">On a specific date</SelectItem>
-                    <SelectItem value="after_occurrences">After X occurrences</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                {repeatEndsType === 'after_occurrences' && (
-                  <Select value={repeatEndsOccurrences} onValueChange={setRepeatEndsOccurrences}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-popover max-h-60">
-                      {[5, 10, 15, 20, 25, 30, 50, 100].map((n) => (
-                        <SelectItem key={n} value={n.toString()}>
-                          After {n} times
-                        </SelectItem>
+                {/* Weekly: Repeat On Days */}
+                {repeatFrequency === 'weekly' && (
+                  <div className="space-y-2">
+                    <span className="text-sm">Repeat on</span>
+                    <div className="flex gap-2 flex-wrap">
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
+                        <button
+                          key={day}
+                          onClick={() => toggleWeeklyDay(index)}
+                          className={cn(
+                            "w-10 h-10 rounded-full text-xs font-medium transition-colors",
+                            weeklyDays.includes(index)
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted text-muted-foreground hover:bg-muted/80"
+                          )}
+                        >
+                          {day}
+                        </button>
                       ))}
-                    </SelectContent>
-                  </Select>
-                )}
-
-                {repeatEndsType === 'on_date' && (
-                  <div className="p-4 bg-muted rounded-lg">
-                    <div className="flex items-center justify-between mb-4">
-                      <button onClick={() => {}} className="p-1">
-                        <ChevronLeft className="w-4 h-4" />
-                      </button>
-                      <span className="text-sm font-medium">
-                        {repeatEndsDate ? format(repeatEndsDate, 'MMMM yyyy') : format(today, 'MMMM yyyy')}
-                      </span>
-                      <button onClick={() => {}} className="p-1">
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-7 gap-1">
-                      {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-                        <div key={i} className="text-center text-xs text-muted-foreground py-1">{d}</div>
-                      ))}
-                      {Array.from({ length: 35 }, (_, i) => {
-                        const day = i - getDay(startOfMonth(repeatEndsDate || today)) + 1;
-                        const daysInCurrentMonth = endOfMonth(repeatEndsDate || today).getDate();
-                        if (day < 1 || day > daysInCurrentMonth) {
-                          return <div key={i} className="aspect-square" />;
-                        }
-                        const date = new Date((repeatEndsDate || today).getFullYear(), (repeatEndsDate || today).getMonth(), day);
-                        const isSelected = repeatEndsDate && isSameDay(date, repeatEndsDate);
-                        return (
-                          <button
-                            key={i}
-                            onClick={() => setRepeatEndsDate(date)}
-                            className={cn(
-                              "aspect-square flex items-center justify-center rounded text-xs",
-                              isSelected ? "bg-primary text-primary-foreground" : "hover:bg-accent"
-                            )}
-                          >
-                            {day}
-                          </button>
-                        );
-                      })}
                     </div>
                   </div>
                 )}
+
+                {/* Monthly: Repeat On Day */}
+                {repeatFrequency === 'monthly' && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Repeat on</span>
+                    <Select value={monthlyDay} onValueChange={setMonthlyDay}>
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover max-h-60">
+                        {Array.from({ length: 30 }, (_, i) => i + 1).map((n) => (
+                          <SelectItem key={n} value={n.toString()}>
+                            Day {n}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Repeat Ends At */}
+                <div className="space-y-3">
+                  <span className="text-sm">Repeat Ends at</span>
+                  <Select value={repeatEndsType} onValueChange={(v) => setRepeatEndsType(v as RepeatEndsType)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover">
+                      <SelectItem value="never">Never</SelectItem>
+                      <SelectItem value="on_date">On a specific date</SelectItem>
+                      <SelectItem value="after_occurrences">After X occurrences</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {repeatEndsType === 'after_occurrences' && (
+                    <Select value={repeatEndsOccurrences} onValueChange={setRepeatEndsOccurrences}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover max-h-60">
+                        {[5, 10, 15, 20, 25, 30, 50, 100].map((n) => (
+                          <SelectItem key={n} value={n.toString()}>
+                            After {n} times
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  {repeatEndsType === 'on_date' && (
+                    <div className="p-4 bg-muted rounded-lg">
+                      <div className="flex items-center justify-between mb-4">
+                        <button onClick={() => {}} className="p-1">
+                          <ChevronLeft className="w-4 h-4" />
+                        </button>
+                        <span className="text-sm font-medium">
+                          {repeatEndsDate ? format(repeatEndsDate, 'MMMM yyyy') : format(today, 'MMMM yyyy')}
+                        </span>
+                        <button onClick={() => {}} className="p-1">
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-7 gap-1">
+                        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                          <div key={i} className="text-center text-xs text-muted-foreground py-1">{d}</div>
+                        ))}
+                        {Array.from({ length: 35 }, (_, i) => {
+                          const day = i - getDay(startOfMonth(repeatEndsDate || today)) + 1;
+                          const daysInCurrentMonth = endOfMonth(repeatEndsDate || today).getDate();
+                          if (day < 1 || day > daysInCurrentMonth) {
+                            return <div key={i} className="aspect-square" />;
+                          }
+                          const date = new Date((repeatEndsDate || today).getFullYear(), (repeatEndsDate || today).getMonth(), day);
+                          const isSelected = repeatEndsDate && isSameDay(date, repeatEndsDate);
+                          return (
+                            <button
+                              key={i}
+                              onClick={() => setRepeatEndsDate(date)}
+                              className={cn(
+                                "aspect-square flex items-center justify-center rounded text-xs",
+                                isSelected ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+                              )}
+                            >
+                              {day}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Safe area padding */}

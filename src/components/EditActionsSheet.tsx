@@ -16,7 +16,8 @@ import {
   Image as ImageIcon,
   Repeat,
   Settings2,
-  ChevronDown
+  ChevronDown,
+  ListTodo
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -37,6 +38,7 @@ export const defaultActions: ActionItem[] = [
   { id: 'priority', name: 'Priority', icon: Flag, enabled: true, color: 'text-orange-500', group: 'organization' },
   { id: 'tags', name: 'Tags', icon: Tag, enabled: true, color: 'text-teal-500', group: 'organization' },
   { id: 'folder', name: 'Folder', icon: FolderIcon, enabled: true, color: 'text-amber-500', group: 'organization' },
+  { id: 'section', name: 'Section', icon: ListTodo, enabled: true, color: 'text-violet-500', group: 'organization' },
   { id: 'image', name: 'Image', icon: ImageIcon, enabled: true, color: 'text-emerald-500', group: 'media' },
 ];
 
