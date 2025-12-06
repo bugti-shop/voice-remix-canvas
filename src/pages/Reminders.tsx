@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { Note, TodoItem } from '@/types/note';
 import { notificationManager } from '@/utils/notifications';
-import { Bell, Calendar, Clock, Repeat, History, Trash2, CheckCircle2 } from 'lucide-react';
+import { Bell, Calendar, Clock, Repeat, History, Trash2, CheckCircle2, AlarmClock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -38,11 +38,22 @@ const Reminders = () => {
     // Listen for notification updates
     const handleNotificationReceived = () => {
       loadHistory();
+      loadReminders();
+    };
+
+    const handleNotificationSnoozed = (event: CustomEvent) => {
+      const { snoozeLabel } = event.detail;
+      toast.success(`Reminder snoozed for ${snoozeLabel}`);
+      loadHistory();
+      loadReminders();
     };
 
     window.addEventListener('notificationReceived', handleNotificationReceived);
+    window.addEventListener('notificationSnoozed', handleNotificationSnoozed as EventListener);
+    
     return () => {
       window.removeEventListener('notificationReceived', handleNotificationReceived);
+      window.removeEventListener('notificationSnoozed', handleNotificationSnoozed as EventListener);
     };
   }, []);
 
@@ -343,6 +354,12 @@ const Reminders = () => {
                                 )}
                                 {item.read ? 'Read' : 'Unread'}
                               </Badge>
+                              {item.snoozed && (
+                                <Badge variant="outline" className="gap-1 text-orange-500 border-orange-500">
+                                  <AlarmClock className="h-3 w-3" />
+                                  Snoozed {item.snoozeLabel}
+                                </Badge>
+                              )}
                               <Badge variant="outline" className="gap-1">
                                 <Clock className="h-3 w-3" />
                                 {format(new Date(item.timestamp), 'MMM dd, h:mm a')}
