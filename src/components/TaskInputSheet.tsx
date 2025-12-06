@@ -378,7 +378,7 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
             </div>
           )}
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             {/* Render action buttons in the order defined by actionItems */}
             {actionItems.filter(a => a.enabled).map((action) => {
               if (action.id === 'date') {
