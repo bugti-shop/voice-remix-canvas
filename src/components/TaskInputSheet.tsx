@@ -62,6 +62,9 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
   const [selectedTagColor, setSelectedTagColor] = useState('#14b8a6');
   const [showTagInput, setShowTagInput] = useState(false);
   const [showManageTags, setShowManageTags] = useState(false);
+  const [editingTag, setEditingTag] = useState<ColoredTag | null>(null);
+  const [editTagName, setEditTagName] = useState('');
+  const [editTagColor, setEditTagColor] = useState('');
   const [deadline, setDeadline] = useState<Date | undefined>();
   const [showDeadlinePicker, setShowDeadlinePicker] = useState(false);
   const [showEditActions, setShowEditActions] = useState(false);
@@ -253,6 +256,37 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
     const updatedSaved = savedTags.filter(t => t.name !== tagName);
     setSavedTags(updatedSaved);
     localStorage.setItem('savedColoredTags', JSON.stringify(updatedSaved));
+  };
+
+  const handleStartEditTag = (tag: ColoredTag) => {
+    setEditingTag(tag);
+    setEditTagName(tag.name);
+    setEditTagColor(tag.color);
+  };
+
+  const handleSaveEditTag = () => {
+    if (!editingTag || !editTagName.trim()) return;
+    
+    const updatedSaved = savedTags.map(t => 
+      t.name === editingTag.name ? { name: editTagName.trim(), color: editTagColor } : t
+    );
+    setSavedTags(updatedSaved);
+    localStorage.setItem('savedColoredTags', JSON.stringify(updatedSaved));
+    
+    // Also update any currently selected tags
+    setColoredTags(coloredTags.map(t => 
+      t.name === editingTag.name ? { name: editTagName.trim(), color: editTagColor } : t
+    ));
+    
+    setEditingTag(null);
+    setEditTagName('');
+    setEditTagColor('');
+  };
+
+  const handleCancelEditTag = () => {
+    setEditingTag(null);
+    setEditTagName('');
+    setEditTagColor('');
   };
 
   if (!isOpen) return null;
@@ -830,7 +864,10 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
       />
 
       {/* Manage Tags Dialog */}
-      <Dialog open={showManageTags} onOpenChange={setShowManageTags}>
+      <Dialog open={showManageTags} onOpenChange={(open) => {
+        setShowManageTags(open);
+        if (!open) handleCancelEditTag();
+      }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Manage Saved Tags</DialogTitle>
@@ -842,23 +879,61 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
               savedTags.map((tag) => (
                 <div 
                   key={tag.name} 
-                  className="flex items-center justify-between p-3 rounded-lg border border-border"
+                  className="flex flex-col gap-2 p-3 rounded-lg border border-border"
                 >
-                  <div className="flex items-center gap-2">
-                    <span 
-                      className="w-4 h-4 rounded-full flex-shrink-0" 
-                      style={{ backgroundColor: tag.color }} 
-                    />
-                    <span className="text-sm font-medium">{tag.name}</span>
-                  </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => handleDeleteSavedTag(tag.name)}
-                    className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                  {editingTag?.name === tag.name ? (
+                    <>
+                      <Input
+                        value={editTagName}
+                        onChange={(e) => setEditTagName(e.target.value)}
+                        placeholder="Tag name"
+                        className="h-9"
+                        autoFocus
+                      />
+                      <div className="flex gap-1.5 flex-wrap">
+                        {tagColors.map((color) => (
+                          <button
+                            key={color}
+                            onClick={() => setEditTagColor(color)}
+                            className={cn(
+                              "w-7 h-7 rounded-full transition-all",
+                              editTagColor === color && "ring-2 ring-primary ring-offset-2"
+                            )}
+                            style={{ backgroundColor: color }}
+                          />
+                        ))}
+                      </div>
+                      <div className="flex gap-2 mt-1">
+                        <Button size="sm" onClick={handleSaveEditTag} className="flex-1 h-8">
+                          Save
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={handleCancelEditTag} className="flex-1 h-8">
+                          Cancel
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <button 
+                        onClick={() => handleStartEditTag(tag)}
+                        className="flex items-center gap-2 flex-1 text-left"
+                      >
+                        <span 
+                          className="w-4 h-4 rounded-full flex-shrink-0" 
+                          style={{ backgroundColor: tag.color }} 
+                        />
+                        <span className="text-sm font-medium">{tag.name}</span>
+                      </button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => handleDeleteSavedTag(tag.name)}
+                        className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))
             )}
