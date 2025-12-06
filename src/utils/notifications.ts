@@ -9,7 +9,13 @@ export interface NotificationData {
   type: 'task' | 'note';
   recurring?: boolean;
   recurringType?: string;
+  originalTitle?: string;
+  originalBody?: string;
 }
+
+export type SnoozeOption = '5min' | '15min' | '1hour';
+
+export const SNOOZE_ACTION_TYPE_ID = 'SNOOZE_ACTION_TYPE';
 
 export class NotificationManager {
   private static instance: NotificationManager;
@@ -32,6 +38,9 @@ export class NotificationManager {
       // Request permissions
       await this.requestPermissions();
 
+      // Register action types for snooze
+      await this.registerActionTypes();
+
       // Set up notification listeners
       await this.setupListeners();
 
@@ -39,6 +48,40 @@ export class NotificationManager {
       console.log('NotificationManager initialized successfully');
     } catch (error) {
       console.error('Failed to initialize NotificationManager:', error);
+    }
+  }
+
+  private async registerActionTypes(): Promise<void> {
+    try {
+      await LocalNotifications.registerActionTypes({
+        types: [
+          {
+            id: SNOOZE_ACTION_TYPE_ID,
+            actions: [
+              {
+                id: 'snooze_5min',
+                title: 'Snooze 5 min',
+              },
+              {
+                id: 'snooze_15min',
+                title: 'Snooze 15 min',
+              },
+              {
+                id: 'snooze_1hour',
+                title: 'Snooze 1 hour',
+              },
+              {
+                id: 'dismiss',
+                title: 'Dismiss',
+                destructive: true,
+              },
+            ],
+          },
+        ],
+      });
+      console.log('Notification action types registered');
+    } catch (error) {
+      console.error('Error registering action types:', error);
     }
   }
 
@@ -50,7 +93,7 @@ export class NotificationManager {
         this.handleNotificationReceived(notification);
       });
 
-      // Listen for notification action performed (user tapped on notification)
+      // Listen for notification action performed (user tapped on notification or action button)
       await LocalNotifications.addListener('localNotificationActionPerformed', (action: ActionPerformed) => {
         console.log('Notification action performed:', action);
         this.handleNotificationAction(action);
@@ -80,24 +123,105 @@ export class NotificationManager {
     window.dispatchEvent(new CustomEvent('notificationReceived', { detail: notification }));
   }
 
-  private handleNotificationAction(action: ActionPerformed): void {
+  private async handleNotificationAction(action: ActionPerformed): Promise<void> {
     const notification = action.notification;
+    const actionId = action.actionId;
     const extra = notification.extra as NotificationData | undefined;
 
+    // Handle snooze actions
+    if (actionId.startsWith('snooze_')) {
+      const snoozeType = actionId.replace('snooze_', '') as SnoozeOption;
+      await this.snoozeNotification(notification, snoozeType);
+      return;
+    }
+
+    // Handle dismiss action
+    if (actionId === 'dismiss') {
+      // Just mark as read and don't reschedule
+      this.markNotificationAsRead(notification.id);
+      return;
+    }
+
+    // Handle tap on notification (open app)
     if (extra?.taskId) {
-      // Navigate to task or mark as read
       window.dispatchEvent(new CustomEvent('taskNotificationTapped', { detail: { taskId: extra.taskId } }));
     } else if (extra?.noteId) {
-      // Navigate to note
       window.dispatchEvent(new CustomEvent('noteNotificationTapped', { detail: { noteId: extra.noteId } }));
     }
 
     // Mark as read in history
-    const history = JSON.parse(localStorage.getItem('notificationHistory') || '[]');
-    const updatedHistory = history.map((item: any) =>
-      item.id === notification.id ? { ...item, read: true } : item
-    );
-    localStorage.setItem('notificationHistory', JSON.stringify(updatedHistory));
+    this.markNotificationAsRead(notification.id);
+  }
+
+  async snoozeNotification(notification: LocalNotificationSchema, snoozeOption: SnoozeOption): Promise<void> {
+    try {
+      let snoozeTime: Date;
+      let snoozeLabel: string;
+
+      switch (snoozeOption) {
+        case '5min':
+          snoozeTime = addMinutes(new Date(), 5);
+          snoozeLabel = '5 minutes';
+          break;
+        case '15min':
+          snoozeTime = addMinutes(new Date(), 15);
+          snoozeLabel = '15 minutes';
+          break;
+        case '1hour':
+          snoozeTime = addHours(new Date(), 1);
+          snoozeLabel = '1 hour';
+          break;
+        default:
+          snoozeTime = addMinutes(new Date(), 5);
+          snoozeLabel = '5 minutes';
+      }
+
+      const extra = notification.extra as NotificationData | undefined;
+      const snoozeNotificationId = Date.now();
+
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: snoozeNotificationId,
+            title: `⏰ Snoozed: ${notification.title || 'Reminder'}`,
+            body: notification.body || '',
+            schedule: { at: snoozeTime },
+            sound: undefined,
+            attachments: undefined,
+            actionTypeId: SNOOZE_ACTION_TYPE_ID,
+            extra: {
+              ...extra,
+              originalTitle: notification.title,
+              originalBody: notification.body,
+              snoozedFrom: notification.id,
+            } as NotificationData,
+          },
+        ],
+      });
+
+      // Update history to show it was snoozed
+      const history = JSON.parse(localStorage.getItem('notificationHistory') || '[]');
+      const updatedHistory = history.map((item: any) =>
+        item.id === notification.id 
+          ? { ...item, snoozed: true, snoozedUntil: snoozeTime.toISOString(), snoozeLabel }
+          : item
+      );
+      localStorage.setItem('notificationHistory', JSON.stringify(updatedHistory));
+
+      // Dispatch event for UI updates
+      window.dispatchEvent(new CustomEvent('notificationSnoozed', { 
+        detail: { 
+          originalId: notification.id, 
+          newId: snoozeNotificationId, 
+          snoozeTime,
+          snoozeLabel 
+        } 
+      }));
+
+      console.log(`Notification snoozed for ${snoozeLabel}`);
+    } catch (error) {
+      console.error('Error snoozing notification:', error);
+    }
   }
 
   async requestPermissions(): Promise<boolean> {
@@ -241,7 +365,7 @@ export class NotificationManager {
               schedule: { at: occurrenceDate },
               sound: undefined,
               attachments: undefined,
-              actionTypeId: '',
+              actionTypeId: SNOOZE_ACTION_TYPE_ID,
               extra: {
                 taskId: task.id,
                 type: 'task',
@@ -262,7 +386,7 @@ export class NotificationManager {
             schedule: { at: reminderTime },
             sound: undefined,
             attachments: undefined,
-            actionTypeId: '',
+            actionTypeId: SNOOZE_ACTION_TYPE_ID,
             extra: {
               taskId: task.id,
               type: 'task',
@@ -329,7 +453,7 @@ export class NotificationManager {
             schedule: { at: occurrenceDate },
             sound: undefined,
             attachments: undefined,
-            actionTypeId: '',
+            actionTypeId: SNOOZE_ACTION_TYPE_ID,
             extra: {
               noteId: note.id,
               type: 'note',
