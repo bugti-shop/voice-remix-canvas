@@ -157,9 +157,10 @@ export const ClockTimePicker = ({
   }, [isDragging, handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
 
   const currentValue = mode === 'hour' ? parseInt(hour) : parseInt(minute);
+  // Hand starts pointing UP after translate, so no need to subtract 90
   const handAngle = mode === 'hour' 
-    ? ((currentValue % 12) * 30) - 90 
-    : (currentValue * 6) - 90;
+    ? (currentValue % 12) * 30 
+    : currentValue * 6;
 
   const handleModeSwitch = (newMode: Mode) => {
     setMode(newMode);
