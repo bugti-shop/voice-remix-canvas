@@ -253,7 +253,8 @@ const Today = () => {
     setSections(sections.map(s => s.id === sectionId ? { ...s, isCollapsed: !s.isCollapsed } : s));
   };
 
-  const handleAddTaskToSection = (sectionId: string) => {
+  const handleAddTaskToSection = async (sectionId: string) => {
+    try { await Haptics.impact({ style: ImpactStyle.Light }); } catch {}
     setInputSectionId(sectionId);
     setIsInputOpen(true);
   };
@@ -940,7 +941,7 @@ const Today = () => {
         </div>
       </main>
 
-      <Button onClick={async () => { try { await Haptics.impact({ style: ImpactStyle.Medium }); } catch {} setIsInputOpen(true); }} className="fixed bottom-20 left-4 right-4 z-30 h-12 text-base font-semibold" size="lg">
+      <Button onClick={() => { Haptics.impact({ style: ImpactStyle.Light }).catch(() => {}); setIsInputOpen(true); }} className="fixed bottom-20 left-4 right-4 z-30 h-12 text-base font-semibold" size="lg">
         <Plus className="h-5 w-5" />Add Task
       </Button>
 
