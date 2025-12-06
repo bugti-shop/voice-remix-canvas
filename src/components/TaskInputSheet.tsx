@@ -68,6 +68,10 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
     const saved = localStorage.getItem('taskInputActions');
     return saved ? JSON.parse(saved) : defaultActions;
   });
+  const [savedTags, setSavedTags] = useState<ColoredTag[]>(() => {
+    const saved = localStorage.getItem('savedColoredTags');
+    return saved ? JSON.parse(saved) : [];
+  });
   const inputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -220,9 +224,23 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
 
   const handleAddTag = () => {
     if (tagInput.trim() && !coloredTags.some(t => t.name === tagInput.trim())) {
-      setColoredTags([...coloredTags, { name: tagInput.trim(), color: selectedTagColor }]);
+      const newTag = { name: tagInput.trim(), color: selectedTagColor };
+      setColoredTags([...coloredTags, newTag]);
+      
+      // Save to localStorage for suggestions
+      const existingSaved = savedTags.filter(t => t.name !== newTag.name);
+      const updatedSaved = [newTag, ...existingSaved].slice(0, 20); // Keep last 20 tags
+      setSavedTags(updatedSaved);
+      localStorage.setItem('savedColoredTags', JSON.stringify(updatedSaved));
+      
       setTagInput('');
       setShowTagInput(false);
+    }
+  };
+
+  const handleAddSavedTag = (tag: ColoredTag) => {
+    if (!coloredTags.some(t => t.name === tag.name)) {
+      setColoredTags([...coloredTags, tag]);
     }
   };
 
@@ -457,6 +475,33 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
                     />
                     <Button size="sm" onClick={handleAddTag} disabled={!tagInput.trim()}>Add</Button>
                   </div>
+                  
+                  {/* Saved tag suggestions */}
+                  {savedTags.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-2">Recent tags</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {savedTags
+                          .filter(st => !coloredTags.some(ct => ct.name === st.name))
+                          .slice(0, 6)
+                          .map((tag) => (
+                            <button
+                              key={tag.name}
+                              onClick={() => handleAddSavedTag(tag)}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full hover:opacity-80 transition-opacity"
+                              style={{ 
+                                backgroundColor: `${tag.color}20`, 
+                                color: tag.color 
+                              }}
+                            >
+                              <Tag className="h-3 w-3" />
+                              {tag.name}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                  
                   <div>
                     <p className="text-xs text-muted-foreground mb-2">Tag color</p>
                     <div className="flex gap-1.5 flex-wrap">

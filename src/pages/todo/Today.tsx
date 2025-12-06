@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { TodoItem, Folder, Priority, Note } from '@/types/note';
-import { Plus, FolderIcon, ChevronRight, ChevronDown, MoreVertical, Eye, EyeOff, Filter, Copy, MousePointer2, FolderPlus, Settings, LayoutList, LayoutGrid, Trash2, ListPlus } from 'lucide-react';
+import { Plus, FolderIcon, ChevronRight, ChevronDown, MoreVertical, Eye, EyeOff, Filter, Copy, MousePointer2, FolderPlus, Settings, LayoutList, LayoutGrid, Trash2, ListPlus, Tag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { TaskInputSheet } from '@/components/TaskInputSheet';
@@ -324,9 +324,9 @@ const Today = () => {
 
   const renderTaskItem = (item: TodoItem) => (
     viewMode === 'flat' ? (
-      <div key={item.id} className="flex items-center gap-3 py-2 px-1 border-b border-border/50">
+      <div key={item.id} className="flex items-start gap-3 py-2 px-1 border-b border-border/50">
         {isSelectionMode && (
-          <Checkbox checked={selectedTaskIds.has(item.id)} onCheckedChange={() => handleSelectTask(item.id)} className="h-5 w-5" />
+          <Checkbox checked={selectedTaskIds.has(item.id)} onCheckedChange={() => handleSelectTask(item.id)} className="h-5 w-5 mt-0.5" />
         )}
         <Checkbox
           checked={item.completed}
@@ -337,15 +337,37 @@ const Today = () => {
             updateItem(item.id, { completed: !!checked });
           }}
           className={cn(
-            "h-5 w-5 rounded-sm border-2",
+            "h-5 w-5 rounded-sm border-2 mt-0.5",
             item.completed 
               ? "border-muted-foreground/50" 
               : getPriorityBorderColor(item.priority)
           )}
         />
-        <span className={cn("flex-1 text-sm", item.completed && "text-muted-foreground")} onClick={() => setSelectedTask(item)}>
-          {item.text}
-        </span>
+        <div className="flex-1 min-w-0" onClick={() => setSelectedTask(item)}>
+          <span className={cn("text-sm block", item.completed && "text-muted-foreground")}>
+            {item.text}
+          </span>
+          {item.coloredTags && item.coloredTags.length > 0 && (
+            <div className="flex items-center gap-1 mt-1 flex-wrap">
+              {item.coloredTags.slice(0, 4).map((tag) => (
+                <span 
+                  key={tag.name}
+                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded-full"
+                  style={{ 
+                    backgroundColor: `${tag.color}20`, 
+                    color: tag.color 
+                  }}
+                >
+                  <Tag className="h-2.5 w-2.5" />
+                  {tag.name}
+                </span>
+              ))}
+              {item.coloredTags.length > 4 && (
+                <span className="text-[10px] text-muted-foreground">+{item.coloredTags.length - 4}</span>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     ) : (
       <TaskItem key={item.id} item={item} onUpdate={updateItem} onDelete={deleteItem} onTaskClick={setSelectedTask} onImageClick={setSelectedImage} isSelected={selectedTaskIds.has(item.id)} isSelectionMode={isSelectionMode} onSelect={handleSelectTask} />
