@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { TodoItem, Folder, Priority, Note } from '@/types/note';
+import { TodoItem, Folder, Priority, Note, TaskSection } from '@/types/note';
 import { WaveformVisualizer } from '@/components/WaveformVisualizer';
-import { Play, Pause, Repeat, Check, Trash2 as TrashIcon } from 'lucide-react';
+import { Play, Pause, Repeat, Check, Trash2 as TrashIcon, Edit, Plus as PlusIcon, ArrowUpCircle, ArrowDownCircle, Move } from 'lucide-react';
 import { Plus, FolderIcon, ChevronRight, ChevronDown, MoreVertical, Eye, EyeOff, Filter, Copy, MousePointer2, FolderPlus, Settings, LayoutList, LayoutGrid, Trash2, ListPlus, Tag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,8 @@ import { MoveToFolderSheet } from '@/components/MoveToFolderSheet';
 import { SelectActionsSheet, SelectAction } from '@/components/SelectActionsSheet';
 import { PrioritySelectSheet } from '@/components/PrioritySelectSheet';
 import { BatchTaskSheet } from '@/components/BatchTaskSheet';
+import { SectionEditSheet } from '@/components/SectionEditSheet';
+import { SectionMoveSheet } from '@/components/SectionMoveSheet';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { notificationManager } from '@/utils/notifications';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -27,11 +29,17 @@ import { isToday, isTomorrow, isThisWeek, isBefore, startOfDay } from 'date-fns'
 
 type ViewMode = 'card' | 'flat';
 
+const defaultSections: TaskSection[] = [
+  { id: 'default', name: 'Tasks', color: '#3b82f6', isCollapsed: false, order: 0 }
+];
+
 const Today = () => {
   const [items, setItems] = useState<TodoItem[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
+  const [sections, setSections] = useState<TaskSection[]>(defaultSections);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [isInputOpen, setIsInputOpen] = useState(false);
+  const [inputSectionId, setInputSectionId] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<TodoItem | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -45,6 +53,9 @@ const Today = () => {
   const [isSelectActionsOpen, setIsSelectActionsOpen] = useState(false);
   const [isPrioritySheetOpen, setIsPrioritySheetOpen] = useState(false);
   const [isBatchTaskOpen, setIsBatchTaskOpen] = useState(false);
+  const [isSectionEditOpen, setIsSectionEditOpen] = useState(false);
+  const [isSectionMoveOpen, setIsSectionMoveOpen] = useState(false);
+  const [editingSection, setEditingSection] = useState<TaskSection | null>(null);
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -70,6 +81,12 @@ const Today = () => {
       setFolders(parsed.map((f: Folder) => ({ ...f, createdAt: new Date(f.createdAt) })));
     }
 
+    const savedSections = localStorage.getItem('todoSections');
+    if (savedSections) {
+      const parsed = JSON.parse(savedSections);
+      setSections(parsed.length > 0 ? parsed : defaultSections);
+    }
+
     const savedShowCompleted = localStorage.getItem('todoShowCompleted');
     if (savedShowCompleted !== null) setShowCompleted(JSON.parse(savedShowCompleted));
     const savedDateFilter = localStorage.getItem('todoDateFilter');
@@ -86,6 +103,7 @@ const Today = () => {
 
   useEffect(() => { localStorage.setItem('todoItems', JSON.stringify(items)); }, [items]);
   useEffect(() => { localStorage.setItem('todoFolders', JSON.stringify(folders)); }, [folders]);
+  useEffect(() => { localStorage.setItem('todoSections', JSON.stringify(sections)); }, [sections]);
   useEffect(() => { localStorage.setItem('todoShowCompleted', JSON.stringify(showCompleted)); }, [showCompleted]);
   useEffect(() => { 
     localStorage.setItem('todoDateFilter', dateFilter); 
@@ -111,11 +129,17 @@ const Today = () => {
   };
 
   const handleAddTask = async (task: Omit<TodoItem, 'id' | 'completed'>) => {
-    const newItem: TodoItem = { id: Date.now().toString(), completed: false, ...task };
+    const newItem: TodoItem = { 
+      id: Date.now().toString(), 
+      completed: false, 
+      sectionId: inputSectionId || sections[0]?.id,
+      ...task 
+    };
     if (newItem.reminderTime) {
       try { await notificationManager.scheduleTaskReminder(newItem); } catch (error) { console.error('Failed to schedule notification:', error); }
     }
     setItems([newItem, ...items]);
+    setInputSectionId(null);
   };
 
   const handleBatchAddTasks = (taskTexts: string[]) => {
@@ -124,9 +148,114 @@ const Today = () => {
       text,
       completed: false,
       folderId: selectedFolderId || undefined,
+      sectionId: inputSectionId || sections[0]?.id,
     }));
     setItems([...newItems, ...items]);
     toast.success(`Added ${newItems.length} task(s)`);
+    setInputSectionId(null);
+  };
+
+  // Section management functions
+  const handleAddSection = (position: 'above' | 'below', referenceId?: string) => {
+    const maxOrder = Math.max(...sections.map(s => s.order), 0);
+    let newOrder = maxOrder + 1;
+    
+    if (referenceId) {
+      const refSection = sections.find(s => s.id === referenceId);
+      if (refSection) {
+        if (position === 'above') {
+          newOrder = refSection.order - 0.5;
+        } else {
+          newOrder = refSection.order + 0.5;
+        }
+      }
+    }
+
+    const newSection: TaskSection = {
+      id: Date.now().toString(),
+      name: 'New Section',
+      color: '#3b82f6',
+      isCollapsed: false,
+      order: newOrder,
+    };
+
+    const updatedSections = [...sections, newSection]
+      .sort((a, b) => a.order - b.order)
+      .map((s, idx) => ({ ...s, order: idx }));
+
+    setSections(updatedSections);
+    setEditingSection(newSection);
+    setIsSectionEditOpen(true);
+    toast.success('Section added');
+  };
+
+  const handleEditSection = (section: TaskSection) => {
+    setEditingSection(section);
+    setIsSectionEditOpen(true);
+  };
+
+  const handleSaveSection = (updatedSection: TaskSection) => {
+    setSections(sections.map(s => s.id === updatedSection.id ? updatedSection : s));
+  };
+
+  const handleDeleteSection = (sectionId: string) => {
+    if (sections.length <= 1) {
+      toast.error('Cannot delete the last section');
+      return;
+    }
+    // Move tasks to the first remaining section
+    const remainingSections = sections.filter(s => s.id !== sectionId);
+    const firstSection = remainingSections.sort((a, b) => a.order - b.order)[0];
+    setItems(items.map(item => item.sectionId === sectionId ? { ...item, sectionId: firstSection.id } : item));
+    setSections(remainingSections);
+    toast.success('Section deleted');
+  };
+
+  const handleDuplicateSection = (sectionId: string) => {
+    const section = sections.find(s => s.id === sectionId);
+    if (!section) return;
+
+    const maxOrder = Math.max(...sections.map(s => s.order), 0);
+    const newSection: TaskSection = {
+      ...section,
+      id: Date.now().toString(),
+      name: `${section.name} (Copy)`,
+      order: maxOrder + 1,
+    };
+
+    // Duplicate tasks in this section
+    const sectionTasks = items.filter(i => i.sectionId === sectionId && !i.completed);
+    const duplicatedTasks = sectionTasks.map((task, idx) => ({
+      ...task,
+      id: `${Date.now()}-${idx}`,
+      sectionId: newSection.id,
+    }));
+
+    setSections([...sections, newSection]);
+    setItems([...duplicatedTasks, ...items]);
+    toast.success('Section duplicated');
+  };
+
+  const handleMoveSection = (sectionId: string, targetIndex: number) => {
+    const sortedSections = [...sections].sort((a, b) => a.order - b.order);
+    const currentIndex = sortedSections.findIndex(s => s.id === sectionId);
+    if (currentIndex === targetIndex) return;
+
+    const [movedSection] = sortedSections.splice(currentIndex, 1);
+    sortedSections.splice(targetIndex, 0, movedSection);
+    
+    const reorderedSections = sortedSections.map((s, idx) => ({ ...s, order: idx }));
+    setSections(reorderedSections);
+    toast.success('Section moved');
+  };
+
+  const handleToggleSectionCollapse = (sectionId: string) => {
+    setSections(sections.map(s => s.id === sectionId ? { ...s, isCollapsed: !s.isCollapsed } : s));
+  };
+
+  const handleAddTaskToSection = (sectionId: string) => {
+    setInputSectionId(sectionId);
+    setIsInputOpen(true);
   };
 
   const updateItem = async (itemId: string, updates: Partial<TodoItem>) => {
@@ -621,8 +750,89 @@ const Today = () => {
     );
   };
 
+  const sortedSections = [...sections].sort((a, b) => a.order - b.order);
+
+  const renderSection = (section: TaskSection) => {
+    const sectionTasks = uncompletedItems.filter(item => item.sectionId === section.id || (!item.sectionId && section.id === sections[0]?.id));
+    
+    return (
+      <div key={section.id} className="rounded-xl overflow-hidden border border-border/30">
+        <div className="flex items-center" style={{ borderLeft: `4px solid ${section.color}` }}>
+          <div className="flex-1 flex items-center gap-3 px-3 py-2.5 bg-muted/30">
+            <span className="text-sm font-semibold">{section.name}</span>
+            <span className="text-xs text-muted-foreground">({sectionTasks.length})</span>
+          </div>
+          
+          {/* Collapse button */}
+          <button
+            onClick={() => handleToggleSectionCollapse(section.id)}
+            className="p-2 hover:bg-muted/50 transition-colors"
+          >
+            {section.isCollapsed ? (
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            )}
+          </button>
+
+          {/* Options menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="p-2 hover:bg-muted/50 transition-colors">
+                <MoreVertical className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48 bg-popover border shadow-lg z-50">
+              <DropdownMenuItem onClick={() => handleEditSection(section)} className="cursor-pointer">
+                <Edit className="h-4 w-4 mr-2" />Edit Section
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleAddTaskToSection(section.id)} className="cursor-pointer">
+                <PlusIcon className="h-4 w-4 mr-2" />Add Task
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleAddSection('above', section.id)} className="cursor-pointer">
+                <ArrowUpCircle className="h-4 w-4 mr-2" />Add Section Above
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleAddSection('below', section.id)} className="cursor-pointer">
+                <ArrowDownCircle className="h-4 w-4 mr-2" />Add Section Below
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDuplicateSection(section.id)} className="cursor-pointer">
+                <Copy className="h-4 w-4 mr-2" />Duplicate Section
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setEditingSection(section); setIsSectionMoveOpen(true); }} className="cursor-pointer">
+                <Move className="h-4 w-4 mr-2" />Move to
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => handleDeleteSection(section.id)} 
+                className="cursor-pointer text-destructive focus:text-destructive"
+                disabled={sections.length <= 1}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        
+        {!section.isCollapsed && (
+          <div className="bg-background" style={{ borderLeft: `4px solid ${section.color}` }}>
+            {sectionTasks.length > 0 ? (
+              <div className="space-y-0">
+                {sectionTasks.map(renderTaskItem)}
+              </div>
+            ) : (
+              <div className="py-4 px-4 text-center text-sm text-muted-foreground">
+                No tasks in this section
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <TodoLayout title="Today">
+    <TodoLayout title="Npd">
       <main className="container mx-auto px-4 py-3 pb-32">
         <div className="max-w-2xl mx-auto">
           {/* Folders */}
@@ -657,6 +867,10 @@ const Today = () => {
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => { setIsSelectionMode(true); setIsSelectActionsOpen(true); }} className="cursor-pointer">
                       <MousePointer2 className="h-4 w-4 mr-2" />Select
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => handleAddSection('below')} className="cursor-pointer">
+                      <PlusIcon className="h-4 w-4 mr-2" />Add Section
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => setIsFolderManageOpen(true)} className="cursor-pointer">
@@ -699,15 +913,15 @@ const Today = () => {
             </div>
           )}
 
-          {/* Tasks */}
+          {/* Tasks by Sections */}
           {processedItems.length === 0 ? (
             <div className="text-center py-20"><p className="text-muted-foreground">No tasks yet. Tap "Add Task" to get started!</p></div>
           ) : (
             <div className="space-y-4">
-              {uncompletedItems.length > 0 && (
-                <div className="space-y-2">{uncompletedItems.map(renderTaskItem)}</div>
-              )}
+              {/* Render sections with their tasks */}
+              {sortedSections.map(renderSection)}
 
+              {/* Completed Section */}
               {showCompleted && completedItems.length > 0 && (
                 <Collapsible open={isCompletedOpen} onOpenChange={setIsCompletedOpen}>
                   <div className="bg-muted/50 rounded-xl p-3 border border-border/30">
@@ -730,7 +944,7 @@ const Today = () => {
         <Plus className="h-5 w-5" />Add Task
       </Button>
 
-      <TaskInputSheet isOpen={isInputOpen} onClose={() => setIsInputOpen(false)} onAddTask={handleAddTask} folders={folders} selectedFolderId={selectedFolderId} onCreateFolder={handleCreateFolder} />
+      <TaskInputSheet isOpen={isInputOpen} onClose={() => { setIsInputOpen(false); setInputSectionId(null); }} onAddTask={handleAddTask} folders={folders} selectedFolderId={selectedFolderId} onCreateFolder={handleCreateFolder} />
       <TaskDetailPage 
         isOpen={!!selectedTask} 
         task={selectedTask} 
@@ -749,6 +963,19 @@ const Today = () => {
       <SelectActionsSheet isOpen={isSelectActionsOpen} onClose={() => setIsSelectActionsOpen(false)} selectedCount={selectedTaskIds.size} onAction={handleSelectAction} />
       <PrioritySelectSheet isOpen={isPrioritySheetOpen} onClose={() => setIsPrioritySheetOpen(false)} onSelect={handleSetPriority} />
       <BatchTaskSheet isOpen={isBatchTaskOpen} onClose={() => setIsBatchTaskOpen(false)} onAddTasks={handleBatchAddTasks} />
+      <SectionEditSheet 
+        isOpen={isSectionEditOpen} 
+        onClose={() => { setIsSectionEditOpen(false); setEditingSection(null); }} 
+        section={editingSection} 
+        onSave={handleSaveSection} 
+      />
+      <SectionMoveSheet 
+        isOpen={isSectionMoveOpen} 
+        onClose={() => { setIsSectionMoveOpen(false); setEditingSection(null); }} 
+        sections={sections} 
+        currentSectionId={editingSection?.id || ''} 
+        onMoveToPosition={(targetIndex) => editingSection && handleMoveSection(editingSection.id, targetIndex)} 
+      />
 
       <Dialog open={!!selectedImage} onOpenChange={(open) => !open && setSelectedImage(null)}>
         <DialogContent className="max-w-3xl"><DialogHeader><DialogTitle>Task Image</DialogTitle></DialogHeader>
