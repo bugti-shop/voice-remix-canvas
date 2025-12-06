@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { TodoItem, Priority, ColoredTag } from '@/types/note';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ChevronDown, ChevronRight, Repeat, Trash2, Check, Tag } from 'lucide-react';
+import { ChevronDown, ChevronRight, Repeat, Trash2, Check, Tag, Play, Pause, Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import {
@@ -45,10 +45,39 @@ export const TaskItem = ({
   const [isOpen, setIsOpen] = useState(true);
   const [swipeX, setSwipeX] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
+  const [isPlayingVoice, setIsPlayingVoice] = useState(false);
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const hasSubtasks = item.subtasks && item.subtasks.length > 0;
   const indentPx = level * 16;
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handlePlayVoice = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!item.voiceRecording) return;
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+      setIsPlayingVoice(false);
+      return;
+    }
+
+    const audio = new Audio(item.voiceRecording.audioUrl);
+    audioRef.current = audio;
+    audio.onended = () => {
+      setIsPlayingVoice(false);
+      audioRef.current = null;
+    };
+    audio.play();
+    setIsPlayingVoice(true);
+  };
 
   const SWIPE_THRESHOLD = 80;
 
@@ -160,11 +189,32 @@ export const TaskItem = ({
                 onClick={(e) => { e.stopPropagation(); if (!isSelectionMode && !isSwiping) onTaskClick(item); }}
               >
                 <div className="flex items-center gap-2">
+                  {item.voiceRecording && (
+                    <Mic className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                  )}
                   <p className={cn("text-sm font-medium truncate", item.completed && "text-muted-foreground")}>{item.text}</p>
                   {item.repeatType && item.repeatType !== 'none' && <Repeat className="h-3 w-3 text-purple-500 flex-shrink-0" />}
                 </div>
+                {/* Voice recording indicator */}
+                {item.voiceRecording && (
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <button
+                      onClick={handlePlayVoice}
+                      className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
+                    >
+                      {isPlayingVoice ? (
+                        <Pause className="h-3 w-3 text-primary" />
+                      ) : (
+                        <Play className="h-3 w-3 text-primary" />
+                      )}
+                      <span className="text-[10px] text-primary font-medium">
+                        {formatDuration(item.voiceRecording.duration)}
+                      </span>
+                    </button>
+                  </div>
+                )}
                 {/* Colored tags display */}
-                {item.coloredTags && item.coloredTags.length > 0 && (
+                {item.coloredTags && item.coloredTags.length > 0 && !item.voiceRecording && (
                   <div className="flex items-center gap-1 mt-1 overflow-hidden">
                     {item.coloredTags.slice(0, 3).map((tag) => (
                       <span 

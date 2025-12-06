@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { TodoItem, Priority, RepeatType, Folder, ColoredTag } from '@/types/note';
+import { TodoItem, Priority, RepeatType, Folder, ColoredTag, VoiceRecording } from '@/types/note';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -15,6 +15,9 @@ import {
   X,
   Repeat,
   Mic,
+  Square,
+  Play,
+  Pause,
   MoreHorizontal,
   Timer,
   Clock,
@@ -76,6 +79,16 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
     const saved = localStorage.getItem('savedColoredTags');
     return saved ? JSON.parse(saved) : [];
   });
+  // Voice recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [voiceRecording, setVoiceRecording] = useState<VoiceRecording | undefined>();
+  const [isPlaying, setIsPlaying] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  
   const inputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -105,6 +118,15 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
       setSelectedTagColor('#14b8a6');
       setShowTagInput(false);
       setDeadline(undefined);
+      setVoiceRecording(undefined);
+      setIsRecording(false);
+      setRecordingTime(0);
+      setIsPlaying(false);
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
     }
   }, [isOpen]);
 
@@ -115,14 +137,14 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
   }, [selectedFolderId]);
 
   const handleSend = async () => {
-    if (!taskText.trim()) return;
+    if (!taskText.trim() && !voiceRecording) return;
 
     try {
       await Haptics.impact({ style: ImpactStyle.Light });
     } catch {}
 
     const mainTask: Omit<TodoItem, 'id' | 'completed'> = {
-      text: taskText,
+      text: taskText || (voiceRecording ? 'Voice Task' : ''),
       priority: priority !== 'none' ? priority : undefined,
       dueDate: deadline || dueDate,
       reminderTime,
@@ -131,11 +153,108 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
       folderId,
       imageUrl,
       coloredTags: coloredTags.length > 0 ? coloredTags : undefined,
+      voiceRecording,
     };
 
     onAddTask(mainTask);
     setTaskText('');
+    setVoiceRecording(undefined);
     inputRef.current?.focus();
+  };
+
+  // Voice recording functions
+  const formatRecordingTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      chunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        chunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const audioBase64 = reader.result as string;
+          const recording: VoiceRecording = {
+            id: Date.now().toString(),
+            audioUrl: audioBase64,
+            duration: recordingTime,
+            timestamp: new Date(),
+          };
+          setVoiceRecording(recording);
+          stream.getTracks().forEach(track => track.stop());
+          setRecordingTime(0);
+          toast.success('Voice recording saved');
+        };
+        reader.readAsDataURL(blob);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+
+      timerRef.current = setInterval(() => {
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
+
+      try {
+        await Haptics.impact({ style: ImpactStyle.Light });
+      } catch {}
+    } catch (error) {
+      toast.error('Failed to access microphone');
+      console.error(error);
+    }
+  };
+
+  const stopRecording = async () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      try {
+        await Haptics.impact({ style: ImpactStyle.Medium });
+      } catch {}
+    }
+  };
+
+  const playVoiceRecording = () => {
+    if (!voiceRecording) return;
+    
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+      setIsPlaying(false);
+      return;
+    }
+
+    const audio = new Audio(voiceRecording.audioUrl);
+    audioRef.current = audio;
+    audio.onended = () => {
+      setIsPlaying(false);
+      audioRef.current = null;
+    };
+    audio.play();
+    setIsPlaying(true);
+  };
+
+  const removeVoiceRecording = () => {
+    setVoiceRecording(undefined);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    setIsPlaying(false);
   };
 
   const handleSetReminder = async (time: string) => {
@@ -323,19 +442,62 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
               autoFocus
             />
 
-            {taskText.trim() ? (
+            {taskText.trim() || voiceRecording ? (
               <button
                 onClick={handleSend}
                 className="w-10 h-10 rounded-lg bg-primary hover:opacity-90 flex items-center justify-center transition-all flex-shrink-0"
               >
                 <Send className="h-5 w-5 text-primary-foreground rotate-45" />
               </button>
+            ) : isRecording ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-mono text-destructive animate-pulse">
+                  {formatRecordingTime(recordingTime)}
+                </span>
+                <button 
+                  onClick={stopRecording}
+                  className="w-10 h-10 rounded-lg bg-destructive hover:opacity-90 flex items-center justify-center transition-all flex-shrink-0"
+                >
+                  <Square className="h-5 w-5 text-destructive-foreground" />
+                </button>
+              </div>
             ) : (
-              <button className="w-10 h-10 rounded-lg bg-muted/30 flex items-center justify-center flex-shrink-0">
+              <button 
+                onClick={startRecording}
+                className="w-10 h-10 rounded-lg bg-muted/30 hover:bg-muted flex items-center justify-center flex-shrink-0 transition-colors"
+              >
                 <Mic className="h-5 w-5 text-muted-foreground/60" />
               </button>
             )}
           </div>
+
+          {/* Voice Recording Display */}
+          {voiceRecording && (
+            <div className="px-4 py-3 bg-primary/10 rounded-lg flex items-center gap-3 mb-4 border border-primary/20">
+              <button
+                onClick={playVoiceRecording}
+                className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0 hover:opacity-90 transition-opacity"
+              >
+                {isPlaying ? (
+                  <Pause className="h-5 w-5 text-primary-foreground" />
+                ) : (
+                  <Play className="h-5 w-5 text-primary-foreground ml-0.5" />
+                )}
+              </button>
+              <div className="flex-1">
+                <p className="text-sm font-medium">Voice Recording</p>
+                <p className="text-xs text-muted-foreground">
+                  {formatRecordingTime(voiceRecording.duration)}
+                </p>
+              </div>
+              <button
+                onClick={removeVoiceRecording}
+                className="p-2 hover:bg-destructive/10 rounded-full transition-colors"
+              >
+                <X className="h-4 w-4 text-destructive" />
+              </button>
+            </div>
+          )}
 
           {repeatType !== 'none' && (
             <div className="px-4 py-2 bg-purple-50 dark:bg-purple-950/20 rounded-lg flex items-center gap-2 mb-4">
