@@ -81,6 +81,59 @@ Add these permissions inside the `<manifest>` tag, before `<application>`:
 </manifest>
 ```
 
+## Local Notifications Permissions (Detailed Guide)
+
+### Android 13+ (API 33+) - POST_NOTIFICATIONS
+
+Starting from Android 13, apps must request the `POST_NOTIFICATIONS` runtime permission to show notifications.
+
+```xml
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+```
+
+**Important:** This permission must be requested at runtime. The app handles this automatically when scheduling notifications.
+
+### Exact Alarm Permissions (Android 12+)
+
+For precise notification timing, exact alarm permissions are required:
+
+```xml
+<!-- For scheduling notifications at exact times -->
+<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+<!-- Alternative for Android 14+ -->
+<uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+```
+
+**Note:** On Android 14+, users may need to manually grant exact alarm permission in Settings > Apps > Npd > Alarms & reminders.
+
+### Boot Receiver for Persistent Notifications
+
+To reschedule notifications after device reboot:
+
+```xml
+<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+```
+
+Add the boot receiver inside `<application>` tag:
+
+```xml
+<receiver android:name="com.capacitorjs.plugins.localnotifications.LocalNotificationRestoreReceiver"
+    android:exported="false">
+    <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+    </intent-filter>
+</receiver>
+```
+
+### Vibration Permission
+
+For haptic feedback on notifications:
+
+```xml
+<uses-permission android:name="android.permission.VIBRATE" />
+```
+
 ## Push Notifications Setup
 
 ### Firebase Cloud Messaging (FCM) Setup
@@ -122,23 +175,33 @@ Voice recording uses the Web Audio API on the web and native permissions on Andr
 
 Android 6.0+ requires runtime permission requests. The app will automatically request microphone permission when the user tries to record.
 
-## Local Notifications Setup
+## Local Notifications Configuration
 
-Local notifications require the following in your `capacitor.config.ts`:
+Add the following to your `capacitor.config.ts`:
 
 ```typescript
 plugins: {
   LocalNotifications: {
     smallIcon: "ic_stat_icon_config_sample",
     iconColor: "#488AFF",
+    sound: "beep.wav",
   },
 }
 ```
 
 ### Notification Icons
 
-Place your notification icon in:
-- `android/app/src/main/res/drawable/ic_stat_icon_config_sample.png`
+Create notification icons in multiple densities:
+- `android/app/src/main/res/drawable-mdpi/ic_stat_icon_config_sample.png` (24x24)
+- `android/app/src/main/res/drawable-hdpi/ic_stat_icon_config_sample.png` (36x36)
+- `android/app/src/main/res/drawable-xhdpi/ic_stat_icon_config_sample.png` (48x48)
+- `android/app/src/main/res/drawable-xxhdpi/ic_stat_icon_config_sample.png` (72x72)
+- `android/app/src/main/res/drawable-xxxhdpi/ic_stat_icon_config_sample.png` (96x96)
+
+### Custom Notification Sounds
+
+Place custom sounds in:
+- `android/app/src/main/res/raw/beep.wav`
 
 ## Building the App
 
@@ -149,13 +212,31 @@ Place your notification icon in:
 ## Troubleshooting
 
 ### Notifications not showing
-- Ensure `POST_NOTIFICATIONS` permission is granted (Android 13+)
-- Check that the app is not in battery optimization mode
+
+1. **Android 13+**: Ensure `POST_NOTIFICATIONS` permission is granted
+   - Go to Settings > Apps > Npd > Notifications > Enable
+   
+2. **Battery Optimization**: Disable battery optimization for the app
+   - Settings > Apps > Npd > Battery > Unrestricted
+
+3. **Do Not Disturb**: Check if DND mode is blocking notifications
+
+### Exact Alarms not working (Android 14+)
+
+1. Go to Settings > Apps > Npd > Alarms & reminders
+2. Enable "Allow setting alarms and reminders"
 
 ### Voice recording not working
+
 - Ensure `RECORD_AUDIO` permission is granted
 - Check microphone is not being used by another app
 
 ### Push notifications not registering
+
 - Verify `google-services.json` is in the correct location
 - Check Firebase project configuration matches your app ID
+
+### Notifications disappearing on reboot
+
+- Ensure `RECEIVE_BOOT_COMPLETED` permission is added
+- Add the boot receiver to AndroidManifest.xml
