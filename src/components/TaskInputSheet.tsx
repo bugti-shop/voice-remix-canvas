@@ -250,17 +250,17 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
             </div>
           )}
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2">
             <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
               <PopoverTrigger asChild>
                 <button
                   className={cn(
-                    "flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-3 rounded-md border transition-all",
+                    "flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
                     dueDate ? "border-border bg-card" : "border-border bg-card hover:bg-muted"
                   )}
                 >
-                  <CalendarIcon className="h-4 w-4 sm:h-5 sm:w-5" />
-                  <span className="text-sm sm:text-base font-semibold">
+                  <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">
                     {dueDate ? format(dueDate, 'MMM d') : 'Date'}
                   </span>
                 </button>
@@ -288,9 +288,9 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
 
             <Popover open={showPriorityMenu} onOpenChange={setShowPriorityMenu}>
               <PopoverTrigger asChild>
-                <button className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-3 rounded-md border border-border bg-card hover:bg-muted transition-all">
-                  <Flag className="h-4 w-4 sm:h-5 sm:w-5" />
-                  <span className="text-sm sm:text-base font-semibold">Priority</span>
+                <button className="flex items-center gap-1.5 px-3 py-2 rounded-md border border-border bg-card hover:bg-muted transition-all">
+                  <Flag className={cn("h-4 w-4", priority !== 'none' ? (priority === 'high' ? 'text-red-500' : priority === 'medium' ? 'text-orange-500' : 'text-blue-500') : 'text-muted-foreground')} />
+                  <span className="text-sm text-muted-foreground">Priority</span>
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-48 p-2 bg-popover z-50" align="start">
@@ -312,19 +312,19 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
             </Popover>
 
             <button
-              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-3 rounded-md border border-border bg-card hover:bg-muted transition-all"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-md border border-border bg-card hover:bg-muted transition-all"
               onClick={() => setShowTimePicker(true)}
             >
-              <Timer className="h-4 w-4 sm:h-5 sm:w-5" />
-              <span className="text-sm sm:text-base font-semibold">
+              <Timer className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">
                 {reminderTime ? format(reminderTime, 'h:mm a') : 'Reminders'}
               </span>
             </button>
 
             <Popover>
               <PopoverTrigger asChild>
-                <button className="flex items-center justify-center w-9 h-9 sm:w-11 sm:h-11 rounded-md border border-border bg-card hover:bg-muted transition-all">
-                  <MoreHorizontal className="h-4 w-4 sm:h-5 sm:w-5" />
+                <button className="flex items-center justify-center w-8 h-8 rounded-md border border-border bg-card hover:bg-muted transition-all">
+                  <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-56 p-2 bg-popover z-50" align="end">
