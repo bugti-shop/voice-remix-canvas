@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ClockTimePicker } from '@/components/ClockTimePicker';
 
 export type RepeatFrequency = 'hour' | 'daily' | 'weekly' | 'monthly' | 'yearly';
 export type RepeatEndsType = 'never' | 'on_date' | 'after_occurrences';
@@ -288,40 +289,16 @@ export const TaskDateTimePage = ({
         </div>
 
         {/* Time Section */}
-        <div className="px-6 py-4 border-t border-border">
-          <h4 className="text-sm font-medium mb-3">Time</h4>
-          <div className="flex items-center gap-2">
-            <Select value={selectedHour} onValueChange={setSelectedHour}>
-              <SelectTrigger className="w-20">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-popover">
-                {hours.map((h) => (
-                  <SelectItem key={h} value={h}>{h}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <span className="text-lg">:</span>
-            <Select value={selectedMinute} onValueChange={setSelectedMinute}>
-              <SelectTrigger className="w-20">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-popover max-h-60">
-                {minutes.map((m) => (
-                  <SelectItem key={m} value={m}>{m}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={selectedPeriod} onValueChange={(v) => setSelectedPeriod(v as 'AM' | 'PM')}>
-              <SelectTrigger className="w-20">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-popover">
-                <SelectItem value="AM">AM</SelectItem>
-                <SelectItem value="PM">PM</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="px-6 py-6 border-t border-border">
+          <h4 className="text-sm font-medium mb-4">Time</h4>
+          <ClockTimePicker
+            hour={selectedHour}
+            minute={selectedMinute}
+            period={selectedPeriod}
+            onHourChange={setSelectedHour}
+            onMinuteChange={setSelectedMinute}
+            onPeriodChange={setSelectedPeriod}
+          />
         </div>
 
         {/* Reminder Section */}
