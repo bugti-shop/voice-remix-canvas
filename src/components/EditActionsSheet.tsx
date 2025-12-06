@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { 
   X, 
   GripVertical, 
@@ -13,7 +15,8 @@ import {
   FolderIcon,
   Image as ImageIcon,
   Repeat,
-  Settings2
+  Settings2,
+  ChevronDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -23,18 +26,25 @@ export interface ActionItem {
   icon: React.ElementType;
   enabled: boolean;
   color?: string;
+  group: 'scheduling' | 'organization' | 'media';
 }
 
 export const defaultActions: ActionItem[] = [
-  { id: 'date', name: 'Date', icon: CalendarIcon, enabled: true, color: 'text-blue-500' },
-  { id: 'priority', name: 'Priority', icon: Flag, enabled: true, color: 'text-orange-500' },
-  { id: 'reminder', name: 'Reminders', icon: Timer, enabled: true, color: 'text-purple-500' },
-  { id: 'tags', name: 'Tags', icon: Tag, enabled: true, color: 'text-teal-500' },
-  { id: 'deadline', name: 'Deadline', icon: CalendarClock, enabled: true, color: 'text-rose-500' },
-  { id: 'folder', name: 'Folder', icon: FolderIcon, enabled: true, color: 'text-amber-500' },
-  { id: 'image', name: 'Image', icon: ImageIcon, enabled: true, color: 'text-emerald-500' },
-  { id: 'repeat', name: 'Repeat', icon: Repeat, enabled: true, color: 'text-indigo-500' },
+  { id: 'date', name: 'Date', icon: CalendarIcon, enabled: true, color: 'text-blue-500', group: 'scheduling' },
+  { id: 'deadline', name: 'Deadline', icon: CalendarClock, enabled: true, color: 'text-rose-500', group: 'scheduling' },
+  { id: 'reminder', name: 'Reminders', icon: Timer, enabled: true, color: 'text-purple-500', group: 'scheduling' },
+  { id: 'repeat', name: 'Repeat', icon: Repeat, enabled: true, color: 'text-indigo-500', group: 'scheduling' },
+  { id: 'priority', name: 'Priority', icon: Flag, enabled: true, color: 'text-orange-500', group: 'organization' },
+  { id: 'tags', name: 'Tags', icon: Tag, enabled: true, color: 'text-teal-500', group: 'organization' },
+  { id: 'folder', name: 'Folder', icon: FolderIcon, enabled: true, color: 'text-amber-500', group: 'organization' },
+  { id: 'image', name: 'Image', icon: ImageIcon, enabled: true, color: 'text-emerald-500', group: 'media' },
 ];
+
+const groupInfo = {
+  scheduling: { name: 'Scheduling', description: 'Date, time & reminders' },
+  organization: { name: 'Organization', description: 'Priority, tags & folders' },
+  media: { name: 'Media', description: 'Images & attachments' },
+};
 
 interface EditActionsSheetProps {
   isOpen: boolean;
@@ -45,22 +55,89 @@ interface EditActionsSheetProps {
 
 export const EditActionsSheet = ({ isOpen, onClose, actions, onSave }: EditActionsSheetProps) => {
   const [localActions, setLocalActions] = useState<ActionItem[]>(actions);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    scheduling: true,
+    organization: true,
+    media: true,
+  });
 
   useEffect(() => {
-    setLocalActions(actions);
+    // Ensure all actions have a group
+    const updatedActions = actions.map(action => ({
+      ...action,
+      group: action.group || defaultActions.find(d => d.id === action.id)?.group || 'organization'
+    }));
+    setLocalActions(updatedActions as ActionItem[]);
   }, [actions]);
 
-  const handleDragEnd = (result: DropResult) => {
-    if (!result.destination) return;
-    
-    const items = Array.from(localActions);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
-    
-    setLocalActions(items);
+  const triggerHaptic = async () => {
+    try {
+      await Haptics.impact({ style: ImpactStyle.Light });
+    } catch {}
   };
 
-  const handleToggle = (id: string) => {
+  const handleDragStart = () => {
+    triggerHaptic();
+  };
+
+  const handleDragEnd = async (result: DropResult) => {
+    if (!result.destination) return;
+    
+    await triggerHaptic();
+    
+    const sourceGroup = result.source.droppableId as ActionItem['group'];
+    const destGroup = result.destination.droppableId as ActionItem['group'];
+    
+    // Get items for source group
+    const sourceItems = localActions.filter(a => a.group === sourceGroup);
+    const otherItems = localActions.filter(a => a.group !== sourceGroup);
+    
+    // Remove from source
+    const [movedItem] = sourceItems.splice(result.source.index, 1);
+    
+    if (sourceGroup === destGroup) {
+      // Reorder within same group
+      sourceItems.splice(result.destination.index, 0, movedItem);
+      
+      // Rebuild full array maintaining group order
+      const newActions = [
+        ...localActions.filter(a => a.group === 'scheduling' && a.id !== movedItem.id),
+        ...localActions.filter(a => a.group === 'organization' && a.id !== movedItem.id),
+        ...localActions.filter(a => a.group === 'media' && a.id !== movedItem.id),
+      ];
+      
+      // Insert moved item at correct position in its group
+      const groupStartIndex = newActions.filter(a => {
+        if (sourceGroup === 'scheduling') return false;
+        if (sourceGroup === 'organization') return a.group === 'scheduling';
+        return a.group === 'scheduling' || a.group === 'organization';
+      }).length;
+      
+      newActions.splice(groupStartIndex + result.destination.index, 0, { ...movedItem, group: sourceGroup });
+      setLocalActions(newActions);
+    } else {
+      // Move to different group
+      const updatedItem = { ...movedItem, group: destGroup };
+      const destItems = localActions.filter(a => a.group === destGroup);
+      destItems.splice(result.destination.index, 0, updatedItem);
+      
+      // Rebuild maintaining order
+      const scheduling = destGroup === 'scheduling' ? destItems : 
+                        sourceGroup === 'scheduling' ? sourceItems :
+                        localActions.filter(a => a.group === 'scheduling');
+      const organization = destGroup === 'organization' ? destItems :
+                          sourceGroup === 'organization' ? sourceItems :
+                          localActions.filter(a => a.group === 'organization');
+      const media = destGroup === 'media' ? destItems :
+                   sourceGroup === 'media' ? sourceItems :
+                   localActions.filter(a => a.group === 'media');
+      
+      setLocalActions([...scheduling, ...organization, ...media]);
+    }
+  };
+
+  const handleToggle = async (id: string) => {
+    await triggerHaptic();
     setLocalActions(prev => 
       prev.map(action => 
         action.id === id ? { ...action, enabled: !action.enabled } : action
@@ -68,14 +145,23 @@ export const EditActionsSheet = ({ isOpen, onClose, actions, onSave }: EditActio
     );
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    await triggerHaptic();
     onSave(localActions);
     onClose();
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
+    await triggerHaptic();
     setLocalActions(defaultActions);
   };
+
+  const toggleGroup = (group: string) => {
+    setOpenGroups(prev => ({ ...prev, [group]: !prev[group] }));
+  };
+
+  const getGroupActions = (group: ActionItem['group']) => 
+    localActions.filter(a => a.group === group);
 
   if (!isOpen) return null;
 
@@ -106,61 +192,89 @@ export const EditActionsSheet = ({ isOpen, onClose, actions, onSave }: EditActio
             Drag to reorder. Toggle to show/hide actions.
           </p>
 
-          <DragDropContext onDragEnd={handleDragEnd}>
-            <Droppable droppableId="actions">
-              {(provided) => (
-                <div
-                  {...provided.droppableProps}
-                  ref={provided.innerRef}
-                  className="space-y-2"
+          <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+            <div className="space-y-4">
+              {(['scheduling', 'organization', 'media'] as const).map((group) => (
+                <Collapsible
+                  key={group}
+                  open={openGroups[group]}
+                  onOpenChange={() => toggleGroup(group)}
                 >
-                  {localActions.map((action, index) => {
-                    const Icon = action.icon;
-                    return (
-                      <Draggable key={action.id} draggableId={action.id} index={index}>
-                        {(provided, snapshot) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            className={cn(
-                              "flex items-center gap-3 p-4 rounded-xl border transition-all",
-                              action.enabled 
-                                ? "bg-card border-border" 
-                                : "bg-muted/30 border-border/50 opacity-60",
-                              snapshot.isDragging && "shadow-lg ring-2 ring-primary/20"
-                            )}
-                          >
-                            <div
-                              {...provided.dragHandleProps}
-                              className="touch-none"
-                            >
-                              <GripVertical className="h-5 w-5 text-muted-foreground flex-shrink-0 cursor-grab active:cursor-grabbing" />
-                            </div>
-                            
-                            <div className={cn("p-2 rounded-lg", action.enabled ? "bg-muted" : "bg-muted/50")}>
-                              <Icon className={cn("h-5 w-5", action.enabled ? action.color : "text-muted-foreground")} />
-                            </div>
+                  <CollapsibleTrigger className="flex items-center justify-between w-full p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium text-sm">{groupInfo[group].name}</span>
+                      <span className="text-xs text-muted-foreground">{groupInfo[group].description}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground bg-background px-2 py-0.5 rounded-full">
+                        {getGroupActions(group).filter(a => a.enabled).length}/{getGroupActions(group).length}
+                      </span>
+                      <ChevronDown className={cn(
+                        "h-4 w-4 text-muted-foreground transition-transform",
+                        openGroups[group] && "rotate-180"
+                      )} />
+                    </div>
+                  </CollapsibleTrigger>
+                  
+                  <CollapsibleContent>
+                    <Droppable droppableId={group}>
+                      {(provided) => (
+                        <div
+                          {...provided.droppableProps}
+                          ref={provided.innerRef}
+                          className="space-y-2 pt-2"
+                        >
+                          {getGroupActions(group).map((action, index) => {
+                            const Icon = action.icon;
+                            return (
+                              <Draggable key={action.id} draggableId={action.id} index={index}>
+                                {(provided, snapshot) => (
+                                  <div
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    className={cn(
+                                      "flex items-center gap-3 p-4 rounded-xl border transition-all",
+                                      action.enabled 
+                                        ? "bg-card border-border" 
+                                        : "bg-muted/30 border-border/50 opacity-60",
+                                      snapshot.isDragging && "shadow-lg ring-2 ring-primary/20"
+                                    )}
+                                  >
+                                    <div
+                                      {...provided.dragHandleProps}
+                                      className="touch-none"
+                                    >
+                                      <GripVertical className="h-5 w-5 text-muted-foreground flex-shrink-0 cursor-grab active:cursor-grabbing" />
+                                    </div>
+                                    
+                                    <div className={cn("p-2 rounded-lg", action.enabled ? "bg-muted" : "bg-muted/50")}>
+                                      <Icon className={cn("h-5 w-5", action.enabled ? action.color : "text-muted-foreground")} />
+                                    </div>
 
-                            <span className={cn(
-                              "flex-1 font-medium",
-                              !action.enabled && "text-muted-foreground"
-                            )}>
-                              {action.name}
-                            </span>
+                                    <span className={cn(
+                                      "flex-1 font-medium",
+                                      !action.enabled && "text-muted-foreground"
+                                    )}>
+                                      {action.name}
+                                    </span>
 
-                            <Switch 
-                              checked={action.enabled} 
-                              onCheckedChange={() => handleToggle(action.id)}
-                            />
-                          </div>
-                        )}
-                      </Draggable>
-                    );
-                  })}
-                  {provided.placeholder}
-                </div>
-              )}
-            </Droppable>
+                                    <Switch 
+                                      checked={action.enabled} 
+                                      onCheckedChange={() => handleToggle(action.id)}
+                                    />
+                                  </div>
+                                )}
+                              </Draggable>
+                            );
+                          })}
+                          {provided.placeholder}
+                        </div>
+                      )}
+                    </Droppable>
+                  </CollapsibleContent>
+                </Collapsible>
+              ))}
+            </div>
           </DragDropContext>
         </div>
       </div>
