@@ -1,5 +1,6 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 
 interface ClockTimePickerProps {
   hour: string;
@@ -12,6 +13,14 @@ interface ClockTimePickerProps {
 
 type Mode = 'hour' | 'minute';
 
+const triggerHaptic = async () => {
+  try {
+    await Haptics.impact({ style: ImpactStyle.Light });
+  } catch (error) {
+    // Haptics not available (web browser)
+  }
+};
+
 export const ClockTimePicker = ({
   hour,
   minute,
@@ -21,7 +30,9 @@ export const ClockTimePicker = ({
   onPeriodChange,
 }: ClockTimePickerProps) => {
   const [mode, setMode] = useState<Mode>('hour');
+  const [isDragging, setIsDragging] = useState(false);
   const clockRef = useRef<HTMLDivElement>(null);
+  const lastValueRef = useRef<number>(-1);
 
   const hours = Array.from({ length: 12 }, (_, i) => i === 0 ? 12 : i);
   const minutes = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
@@ -34,21 +45,12 @@ export const ClockTimePicker = ({
     };
   };
 
-  const handleClockInteraction = useCallback((e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
-    if (!clockRef.current) return;
+  const calculateValue = useCallback((clientX: number, clientY: number) => {
+    if (!clockRef.current) return null;
 
     const rect = clockRef.current.getBoundingClientRect();
     const centerX = rect.width / 2;
     const centerY = rect.height / 2;
-
-    let clientX: number, clientY: number;
-    if ('touches' in e) {
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    } else {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    }
 
     const x = clientX - rect.left - centerX;
     const y = clientY - rect.top - centerY;
@@ -57,27 +59,115 @@ export const ClockTimePicker = ({
     if (angle < 0) angle += 360;
 
     if (mode === 'hour') {
-      const hourValue = Math.round(angle / 30);
-      const selectedHour = hourValue === 0 ? 12 : hourValue;
-      onHourChange(selectedHour.toString());
-      setTimeout(() => setMode('minute'), 200);
+      const hourValue = Math.round(angle / 30) % 12;
+      return hourValue === 0 ? 12 : hourValue;
     } else {
-      const minuteValue = Math.round(angle / 6) % 60;
-      onMinuteChange(minuteValue.toString().padStart(2, '0'));
+      return Math.round(angle / 6) % 60;
+    }
+  }, [mode]);
+
+  const updateValue = useCallback((value: number) => {
+    if (value === lastValueRef.current) return;
+    
+    lastValueRef.current = value;
+    triggerHaptic();
+
+    if (mode === 'hour') {
+      onHourChange(value.toString());
+    } else {
+      onMinuteChange(value.toString().padStart(2, '0'));
     }
   }, [mode, onHourChange, onMinuteChange]);
+
+  const handleStart = useCallback((clientX: number, clientY: number) => {
+    setIsDragging(true);
+    const value = calculateValue(clientX, clientY);
+    if (value !== null) {
+      updateValue(value);
+    }
+  }, [calculateValue, updateValue]);
+
+  const handleMove = useCallback((clientX: number, clientY: number) => {
+    if (!isDragging) return;
+    const value = calculateValue(clientX, clientY);
+    if (value !== null) {
+      updateValue(value);
+    }
+  }, [isDragging, calculateValue, updateValue]);
+
+  const handleEnd = useCallback(() => {
+    setIsDragging(false);
+    lastValueRef.current = -1;
+  }, []);
+
+  // Mouse events
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    handleStart(e.clientX, e.clientY);
+  };
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    handleMove(e.clientX, e.clientY);
+  }, [handleMove]);
+
+  const handleMouseUp = useCallback(() => {
+    handleEnd();
+  }, [handleEnd]);
+
+  // Touch events
+  const handleTouchStart = (e: React.TouchEvent) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    handleStart(touch.clientX, touch.clientY);
+  };
+
+  const handleTouchMove = useCallback((e: TouchEvent) => {
+    const touch = e.touches[0];
+    handleMove(touch.clientX, touch.clientY);
+  }, [handleMove]);
+
+  const handleTouchEnd = useCallback(() => {
+    handleEnd();
+  }, [handleEnd]);
+
+  // Add/remove global event listeners for dragging
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('touchmove', handleTouchMove, { passive: false });
+      window.addEventListener('touchend', handleTouchEnd);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [isDragging, handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
 
   const currentValue = mode === 'hour' ? parseInt(hour) : parseInt(minute);
   const handAngle = mode === 'hour' 
     ? ((currentValue % 12) * 30) - 90 
     : (currentValue * 6) - 90;
 
+  const handleModeSwitch = (newMode: Mode) => {
+    setMode(newMode);
+    triggerHaptic();
+  };
+
+  const handlePeriodSwitch = (newPeriod: 'AM' | 'PM') => {
+    onPeriodChange(newPeriod);
+    triggerHaptic();
+  };
+
   return (
     <div className="flex flex-col items-center gap-6 w-full max-w-xs mx-auto">
       {/* Time Display */}
       <div className="flex items-center justify-center">
         <button
-          onClick={() => setMode('hour')}
+          onClick={() => handleModeSwitch('hour')}
           className={cn(
             "text-5xl font-medium transition-colors",
             mode === 'hour' ? "text-primary" : "text-muted-foreground"
@@ -87,7 +177,7 @@ export const ClockTimePicker = ({
         </button>
         <span className="text-5xl font-medium text-muted-foreground mx-1">:</span>
         <button
-          onClick={() => setMode('minute')}
+          onClick={() => handleModeSwitch('minute')}
           className={cn(
             "text-5xl font-medium transition-colors",
             mode === 'minute' ? "text-primary" : "text-muted-foreground"
@@ -97,7 +187,7 @@ export const ClockTimePicker = ({
         </button>
         <div className="flex flex-col ml-3 gap-0.5">
           <button
-            onClick={() => onPeriodChange('AM')}
+            onClick={() => handlePeriodSwitch('AM')}
             className={cn(
               "text-sm font-semibold px-1.5 py-0.5 rounded transition-colors",
               period === 'AM' ? "text-primary" : "text-muted-foreground"
@@ -106,7 +196,7 @@ export const ClockTimePicker = ({
             AM
           </button>
           <button
-            onClick={() => onPeriodChange('PM')}
+            onClick={() => handlePeriodSwitch('PM')}
             className={cn(
               "text-sm font-semibold px-1.5 py-0.5 rounded transition-colors",
               period === 'PM' ? "text-primary" : "text-muted-foreground"
@@ -120,23 +210,26 @@ export const ClockTimePicker = ({
       {/* Clock Face */}
       <div
         ref={clockRef}
-        onClick={handleClockInteraction}
-        onTouchStart={handleClockInteraction}
+        onMouseDown={handleMouseDown}
+        onTouchStart={handleTouchStart}
         className="relative w-full aspect-square max-w-[280px] rounded-full bg-muted/50 cursor-pointer select-none"
         style={{ touchAction: 'none' }}
       >
-        {/* Inner circle background for selected area */}
-        <div className="absolute inset-[15%] rounded-full bg-muted/30" />
+        {/* Inner circle background */}
+        <div className="absolute inset-[12%] rounded-full bg-muted/30" />
         
         {/* Clock Center Dot */}
-        <div className="absolute top-1/2 left-1/2 w-2 h-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary z-20" />
+        <div className="absolute top-1/2 left-1/2 w-3 h-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary z-20" />
 
         {/* Clock Hand */}
         <div
-          className="absolute top-1/2 left-1/2 origin-center transition-transform duration-150 z-10"
+          className={cn(
+            "absolute top-1/2 left-1/2 origin-center z-10",
+            isDragging ? "transition-none" : "transition-transform duration-200 ease-out"
+          )}
           style={{
             width: '2px',
-            height: '35%',
+            height: '40%',
             backgroundColor: 'hsl(var(--primary))',
             transform: `translate(-50%, -100%) rotate(${handAngle}deg)`,
             transformOrigin: 'bottom center',
@@ -157,7 +250,7 @@ export const ClockTimePicker = ({
                 onClick={(e) => {
                   e.stopPropagation();
                   onHourChange(h.toString());
-                  setTimeout(() => setMode('minute'), 200);
+                  triggerHaptic();
                 }}
                 className={cn(
                   "absolute w-10 h-10 flex items-center justify-center rounded-full text-base font-medium transition-all z-30",
@@ -182,6 +275,7 @@ export const ClockTimePicker = ({
                 onClick={(e) => {
                   e.stopPropagation();
                   onMinuteChange(m.toString().padStart(2, '0'));
+                  triggerHaptic();
                 }}
                 className={cn(
                   "absolute w-10 h-10 flex items-center justify-center rounded-full text-base font-medium transition-all z-30",
