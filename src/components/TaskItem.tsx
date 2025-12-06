@@ -172,20 +172,6 @@ export const TaskItem = ({
                 />
               )}
               
-              {/* Expand/Collapse button for subtasks */}
-              {hasSubtasks && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
-                  className="p-1 rounded hover:bg-muted transition-colors flex-shrink-0"
-                >
-                  {isOpen ? (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  )}
-                </button>
-              )}
-              
               <div className="relative flex items-center flex-shrink-0">
                 <Checkbox
                   checked={item.completed}
@@ -272,6 +258,19 @@ export const TaskItem = ({
                 >
                   <img src={item.imageUrl} alt="Task attachment" className="w-full h-full object-cover" />
                 </div>
+              )}
+              {/* Expand/Collapse button for subtasks - at the right end */}
+              {hasSubtasks && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
+                  className="p-1 rounded hover:bg-muted transition-colors flex-shrink-0"
+                >
+                  {isOpen ? (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </button>
               )}
             </div>
           </div>
