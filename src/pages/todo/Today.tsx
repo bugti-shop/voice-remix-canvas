@@ -461,10 +461,10 @@ const Today = () => {
             }}
             onClick={(e) => e.stopPropagation()}
             className={cn(
-              "h-5 w-5 rounded-sm border-2 mt-0.5 flex-shrink-0",
+              "h-5 w-5 rounded-sm border-0 mt-0.5 flex-shrink-0",
               item.completed 
-                ? "border-muted-foreground/40 bg-transparent data-[state=checked]:bg-transparent data-[state=checked]:text-muted-foreground/60" 
-                : getPriorityBorderColor(item.priority)
+                ? "bg-muted-foreground/30 data-[state=checked]:bg-muted-foreground/30 data-[state=checked]:text-muted-foreground/70" 
+                : cn("border-2", getPriorityBorderColor(item.priority))
             )}
           />
           <div className="flex-1 min-w-0" onClick={() => !currentSwipe?.isSwiping && setSelectedTask(item)}>
