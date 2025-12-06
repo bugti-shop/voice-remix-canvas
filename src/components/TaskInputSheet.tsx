@@ -21,7 +21,8 @@ import {
   CalendarCheck,
   Tag,
   CalendarClock,
-  Settings2
+  Settings2,
+  ListTodo
 } from 'lucide-react';
 import { EditActionsSheet, ActionItem, defaultActions } from './EditActionsSheet';
 import { WaveformVisualizer } from './WaveformVisualizer';
@@ -32,6 +33,14 @@ import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { TaskDateTimePage, RepeatSettings } from './TaskDateTimePage';
 
+interface TaskSection {
+  id: string;
+  name: string;
+  color: string;
+  isCollapsed: boolean;
+  order: number;
+}
+
 interface TaskInputSheetProps {
   isOpen: boolean;
   onClose: () => void;
@@ -39,9 +48,11 @@ interface TaskInputSheetProps {
   folders: Folder[];
   selectedFolderId?: string | null;
   onCreateFolder: (name: string, color: string) => void;
+  sections?: TaskSection[];
+  selectedSectionId?: string | null;
 }
 
-export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFolderId, onCreateFolder }: TaskInputSheetProps) => {
+export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFolderId, onCreateFolder, sections = [], selectedSectionId }: TaskInputSheetProps) => {
   const [taskText, setTaskText] = useState('');
   const [priority, setPriority] = useState<Priority>('none');
   const [dueDate, setDueDate] = useState<Date | undefined>();
@@ -49,9 +60,12 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
   const [repeatType, setRepeatType] = useState<RepeatType>('none');
   const [repeatDays, setRepeatDays] = useState<number[]>([]);
   const [folderId, setFolderId] = useState<string | undefined>();
+  const [sectionId, setSectionId] = useState<string | undefined>();
   const [showDateTimePage, setShowDateTimePage] = useState(false);
+  const [showDeadlinePage, setShowDeadlinePage] = useState(false);
   const [showPriorityMenu, setShowPriorityMenu] = useState(false);
   const [showFolderDialog, setShowFolderDialog] = useState(false);
+  const [showSectionPopover, setShowSectionPopover] = useState(false);
   const [repeatSettings, setRepeatSettings] = useState<RepeatSettings | undefined>();
   const [newFolderName, setNewFolderName] = useState('');
   const [selectedColor, setSelectedColor] = useState('#3b82f6');
@@ -65,7 +79,7 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
   const [editTagName, setEditTagName] = useState('');
   const [editTagColor, setEditTagColor] = useState('');
   const [deadline, setDeadline] = useState<Date | undefined>();
-  const [showDeadlinePicker, setShowDeadlinePicker] = useState(false);
+  const [deadlineReminderTime, setDeadlineReminderTime] = useState<Date | undefined>();
   const [showEditActions, setShowEditActions] = useState(false);
   const [actionItems, setActionItems] = useState<ActionItem[]>(() => {
     const saved = localStorage.getItem('taskInputActions');
@@ -112,12 +126,14 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
       setRepeatType('none');
       setRepeatDays([]);
       setFolderId(undefined);
+      setSectionId(undefined);
       setImageUrl(undefined);
       setColoredTags([]);
       setTagInput('');
       setSelectedTagColor('#14b8a6');
       setShowTagInput(false);
       setDeadline(undefined);
+      setDeadlineReminderTime(undefined);
       setVoiceRecording(undefined);
       setIsRecording(false);
       setRecordingTime(0);
@@ -137,6 +153,12 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
   }, [isOpen]);
 
   useEffect(() => {
+    if (selectedSectionId) {
+      setSectionId(selectedSectionId);
+    }
+  }, [selectedSectionId]);
+
+  useEffect(() => {
     if (selectedFolderId) {
       setFolderId(selectedFolderId);
     }
@@ -152,15 +174,21 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
     const mainTask: Omit<TodoItem, 'id' | 'completed'> = {
       text: taskText || (voiceRecording ? 'Voice Task' : ''),
       priority: priority !== 'none' ? priority : undefined,
-      dueDate: deadline || dueDate,
-      reminderTime,
+      dueDate: dueDate,
+      reminderTime: reminderTime || deadlineReminderTime,
       repeatType: repeatType !== 'none' ? repeatType : undefined,
       repeatDays: repeatType === 'custom' && repeatDays.length > 0 ? repeatDays : undefined,
       folderId,
+      sectionId,
       imageUrl,
       coloredTags: coloredTags.length > 0 ? coloredTags : undefined,
       voiceRecording,
     };
+
+    // If deadline is set, store it in dueDate
+    if (deadline) {
+      mainTask.dueDate = deadline;
+    }
 
     onAddTask(mainTask);
     setTaskText('');
@@ -577,6 +605,26 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
             </div>
           )}
 
+          {/* Deadline indicator */}
+          {deadline && (
+            <div className="px-4 py-2 bg-rose-50 dark:bg-rose-950/20 rounded-lg flex items-center gap-2 mb-4">
+              <CalendarClock className="h-4 w-4 text-rose-500" />
+              <span className="text-sm text-rose-700 dark:text-rose-300 font-medium">
+                Deadline: {format(deadline, 'MMM d')}
+                {deadlineReminderTime ? ` • Reminder ${format(deadlineReminderTime, 'h:mm a')}` : ''}
+              </span>
+              <button
+                onClick={() => {
+                  setDeadline(undefined);
+                  setDeadlineReminderTime(undefined);
+                }}
+                className="ml-auto"
+              >
+                <X className="h-4 w-4 text-rose-500 hover:text-rose-700" />
+              </button>
+            </div>
+          )}
+
           {/* Tags display */}
           {coloredTags.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-3">
@@ -790,37 +838,55 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
 
               if (action.id === 'deadline') {
                 return (
-                  <Popover key={action.id} open={showDeadlinePicker} onOpenChange={setShowDeadlinePicker}>
+                  <button
+                    key={action.id}
+                    onClick={() => setShowDeadlinePage(true)}
+                    className={cn(
+                      "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all whitespace-nowrap",
+                      deadline ? "border-rose-500 bg-rose-50 dark:bg-rose-950/30" : "border-border bg-card hover:bg-muted"
+                    )}
+                  >
+                    {deadline && <span className="absolute -top-1 -right-1 w-2 h-2 bg-rose-500 rounded-full" />}
+                    <CalendarClock className={cn("h-4 w-4 flex-shrink-0", deadline ? "text-rose-500" : "text-muted-foreground")} />
+                    <span className={cn("text-sm whitespace-nowrap", deadline ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground")}>
+                      {deadline ? format(deadline, 'MMM d') : 'Deadline'}
+                    </span>
+                  </button>
+                );
+              }
+
+              if (action.id === 'section') {
+                return (
+                  <Popover key={action.id} open={showSectionPopover} onOpenChange={setShowSectionPopover}>
                     <PopoverTrigger asChild>
                       <button
                         className={cn(
                           "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all whitespace-nowrap",
-                          deadline ? "border-rose-500 bg-rose-50 dark:bg-rose-950/30" : "border-border bg-card hover:bg-muted"
+                          sectionId ? "border-violet-500 bg-violet-50 dark:bg-violet-950/30" : "border-border bg-card hover:bg-muted"
                         )}
                       >
-                        {deadline && <span className="absolute -top-1 -right-1 w-2 h-2 bg-rose-500 rounded-full" />}
-                        <CalendarClock className={cn("h-4 w-4 flex-shrink-0", deadline ? "text-rose-500" : "text-muted-foreground")} />
-                        <span className={cn("text-sm whitespace-nowrap", deadline ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground")}>
-                          {deadline ? format(deadline, 'MMM d') : 'Deadline'}
+                        {sectionId && <span className="absolute -top-1 -right-1 w-2 h-2 bg-violet-500 rounded-full" />}
+                        <ListTodo className={cn("h-4 w-4 flex-shrink-0", sectionId ? "text-violet-500" : "text-muted-foreground")} />
+                        <span className={cn("text-sm whitespace-nowrap", sectionId ? "text-violet-600 dark:text-violet-400" : "text-muted-foreground")}>
+                          {sectionId ? sections.find(s => s.id === sectionId)?.name || 'Section' : 'Section'}
                         </span>
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 bg-popover z-50" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={deadline}
-                        onSelect={(date) => {
-                          setDeadline(date);
-                          setShowDeadlinePicker(false);
-                        }}
-                      />
-                      {deadline && (
-                        <div className="p-2 border-t">
-                          <Button variant="ghost" size="sm" className="w-full text-rose-500" onClick={() => { setDeadline(undefined); setShowDeadlinePicker(false); }}>
-                            <X className="h-4 w-4 mr-2" />Remove Deadline
+                    <PopoverContent className="w-56 p-2 bg-popover z-50" align="start">
+                      <div className="space-y-1">
+                        {sections.map((section) => (
+                          <Button
+                            key={section.id}
+                            variant={sectionId === section.id ? "secondary" : "ghost"}
+                            size="sm"
+                            className="w-full justify-start"
+                            onClick={() => { setSectionId(section.id); setShowSectionPopover(false); }}
+                          >
+                            <div className="w-3 h-3 rounded-sm mr-2" style={{ backgroundColor: section.color }} />
+                            {section.name}
                           </Button>
-                        </div>
-                      )}
+                        ))}
+                      </div>
                     </PopoverContent>
                   </Popover>
                 );
@@ -955,6 +1021,48 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
         onSave={handleDateTimeSave}
         initialDate={dueDate}
         initialRepeatSettings={repeatSettings}
+      />
+
+      {/* Deadline Page - Date/Time/Reminder without repeat */}
+      <TaskDateTimePage
+        isOpen={showDeadlinePage}
+        onClose={() => setShowDeadlinePage(false)}
+        onSave={(data) => {
+          setDeadline(data.selectedDate);
+          if (data.reminder && data.reminder !== 'none' && data.selectedDate) {
+            const reminderDate = new Date(data.selectedDate);
+            switch (data.reminder) {
+              case '5min':
+                reminderDate.setMinutes(reminderDate.getMinutes() - 5);
+                break;
+              case '10min':
+                reminderDate.setMinutes(reminderDate.getMinutes() - 10);
+                break;
+              case '15min':
+                reminderDate.setMinutes(reminderDate.getMinutes() - 15);
+                break;
+              case '30min':
+                reminderDate.setMinutes(reminderDate.getMinutes() - 30);
+                break;
+              case '1hour':
+                reminderDate.setHours(reminderDate.getHours() - 1);
+                break;
+              case '2hours':
+                reminderDate.setHours(reminderDate.getHours() - 2);
+                break;
+              case '1day':
+                reminderDate.setDate(reminderDate.getDate() - 1);
+                break;
+            }
+            setDeadlineReminderTime(reminderDate);
+          } else {
+            setDeadlineReminderTime(undefined);
+          }
+          setShowDeadlinePage(false);
+          toast.success('Deadline saved');
+        }}
+        initialDate={deadline}
+        hideRepeat={true}
       />
 
       {/* Edit Actions Sheet */}
