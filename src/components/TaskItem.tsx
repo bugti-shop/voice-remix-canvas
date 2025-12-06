@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
-import { TodoItem, Priority } from '@/types/note';
+import { TodoItem, Priority, ColoredTag } from '@/types/note';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ChevronDown, ChevronRight, Repeat, Trash2, Check } from 'lucide-react';
+import { ChevronDown, ChevronRight, Repeat, Trash2, Check, Tag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import {
@@ -162,6 +162,27 @@ export const TaskItem = ({
                   <p className={cn("text-sm font-medium truncate", item.completed && "text-muted-foreground")}>{item.text}</p>
                   {item.repeatType && item.repeatType !== 'none' && <Repeat className="h-3 w-3 text-purple-500 flex-shrink-0" />}
                 </div>
+                {/* Colored tags display */}
+                {item.coloredTags && item.coloredTags.length > 0 && (
+                  <div className="flex items-center gap-1 mt-1 overflow-hidden">
+                    {item.coloredTags.slice(0, 3).map((tag) => (
+                      <span 
+                        key={tag.name}
+                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded-full truncate max-w-[60px]"
+                        style={{ 
+                          backgroundColor: `${tag.color}20`, 
+                          color: tag.color 
+                        }}
+                      >
+                        <Tag className="h-2.5 w-2.5 flex-shrink-0" />
+                        <span className="truncate">{tag.name}</span>
+                      </span>
+                    ))}
+                    {item.coloredTags.length > 3 && (
+                      <span className="text-[10px] text-muted-foreground">+{item.coloredTags.length - 3}</span>
+                    )}
+                  </div>
+                )}
                 {hasSubtasks && <p className="text-xs text-muted-foreground mt-1">{item.subtasks!.filter(st => st.completed).length}/{item.subtasks!.length} subtasks</p>}
               </div>
               {item.imageUrl && (
