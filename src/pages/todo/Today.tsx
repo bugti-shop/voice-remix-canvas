@@ -478,23 +478,9 @@ const Today = () => {
             onTouchMove={(e) => handleFlatTouchMove(item.id, e)}
             onTouchEnd={() => handleFlatTouchEnd(item)}
           >
-            {isSelectionMode && (
+          {isSelectionMode && (
               <Checkbox checked={selectedTaskIds.has(item.id)} onCheckedChange={() => handleSelectTask(item.id)} className="h-5 w-5 mt-0.5" />
             )}
-            
-            {/* Expand/Collapse button for subtasks */}
-            {hasSubtasks ? (
-              <button
-                onClick={(e) => { e.stopPropagation(); toggleSubtasks(item.id); }}
-                className="mt-0.5 p-0.5 rounded hover:bg-muted transition-colors flex-shrink-0"
-              >
-                {isExpanded ? (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                )}
-              </button>
-            ) : null}
             
             <Checkbox
               checked={item.completed}
@@ -576,6 +562,19 @@ const Today = () => {
               >
                 <img src={item.imageUrl} alt="Task attachment" className="w-full h-full object-cover" />
               </div>
+            )}
+            {/* Expand/Collapse button for subtasks - at the right end */}
+            {hasSubtasks && (
+              <button
+                onClick={(e) => { e.stopPropagation(); toggleSubtasks(item.id); }}
+                className="mt-0.5 p-1 rounded hover:bg-muted transition-colors flex-shrink-0"
+              >
+                {isExpanded ? (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                )}
+              </button>
             )}
           </div>
         </div>
