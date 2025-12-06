@@ -256,11 +256,11 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
                 <button
                   className={cn(
                     "flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
-                    dueDate ? "border-border bg-card" : "border-border bg-card hover:bg-muted"
+                    dueDate ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30" : "border-border bg-card hover:bg-muted"
                   )}
                 >
-                  <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">
+                  <CalendarIcon className={cn("h-4 w-4", dueDate ? "text-blue-500" : "text-muted-foreground")} />
+                  <span className={cn("text-sm", dueDate ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground")}>
                     {dueDate ? format(dueDate, 'MMM d') : 'Date'}
                   </span>
                 </button>
@@ -288,9 +288,27 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
 
             <Popover open={showPriorityMenu} onOpenChange={setShowPriorityMenu}>
               <PopoverTrigger asChild>
-                <button className="flex items-center gap-1.5 px-3 py-2 rounded-md border border-border bg-card hover:bg-muted transition-all">
-                  <Flag className={cn("h-4 w-4", priority !== 'none' ? (priority === 'high' ? 'text-red-500' : priority === 'medium' ? 'text-orange-500' : 'text-blue-500') : 'text-muted-foreground')} />
-                  <span className="text-sm text-muted-foreground">Priority</span>
+                <button className={cn(
+                  "flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
+                  priority === 'high' ? "border-red-500 bg-red-50 dark:bg-red-950/30" :
+                  priority === 'medium' ? "border-orange-500 bg-orange-50 dark:bg-orange-950/30" :
+                  priority === 'low' ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30" :
+                  "border-border bg-card hover:bg-muted"
+                )}>
+                  <Flag className={cn("h-4 w-4", 
+                    priority === 'high' ? 'text-red-500' : 
+                    priority === 'medium' ? 'text-orange-500' : 
+                    priority === 'low' ? 'text-blue-500' : 
+                    'text-muted-foreground'
+                  )} />
+                  <span className={cn("text-sm",
+                    priority === 'high' ? 'text-red-600 dark:text-red-400' : 
+                    priority === 'medium' ? 'text-orange-600 dark:text-orange-400' : 
+                    priority === 'low' ? 'text-blue-600 dark:text-blue-400' : 
+                    'text-muted-foreground'
+                  )}>
+                    {priority !== 'none' ? (priority.charAt(0).toUpperCase() + priority.slice(1)) : 'Priority'}
+                  </span>
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-48 p-2 bg-popover z-50" align="start">
@@ -312,11 +330,14 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
             </Popover>
 
             <button
-              className="flex items-center gap-1.5 px-3 py-2 rounded-md border border-border bg-card hover:bg-muted transition-all"
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
+                reminderTime ? "border-purple-500 bg-purple-50 dark:bg-purple-950/30" : "border-border bg-card hover:bg-muted"
+              )}
               onClick={() => setShowTimePicker(true)}
             >
-              <Timer className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">
+              <Timer className={cn("h-4 w-4", reminderTime ? "text-purple-500" : "text-muted-foreground")} />
+              <span className={cn("text-sm", reminderTime ? "text-purple-600 dark:text-purple-400" : "text-muted-foreground")}>
                 {reminderTime ? format(reminderTime, 'h:mm a') : 'Reminders'}
               </span>
             </button>
