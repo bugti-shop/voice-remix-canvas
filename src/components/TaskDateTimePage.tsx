@@ -146,6 +146,7 @@ export const TaskDateTimePage = ({
 
   const reminderOptions = [
     { value: '', label: 'No reminder' },
+    { value: 'instant', label: 'Instant (at exact time)' },
     { value: '5min', label: '5 minutes before' },
     { value: '10min', label: '10 minutes before' },
     { value: '15min', label: '15 minutes before' },
