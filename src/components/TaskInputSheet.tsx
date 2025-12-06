@@ -13,17 +13,12 @@ import {
   Image as ImageIcon,
   Send,
   X,
-  Repeat,
   Mic,
   Square,
   Play,
   Pause,
-  MoreHorizontal,
   Timer,
-  Clock,
-  Bell,
   CalendarCheck,
-  BellRing,
   Tag,
   CalendarClock,
   Settings2
@@ -32,9 +27,10 @@ import { EditActionsSheet, ActionItem, defaultActions } from './EditActionsSheet
 import { WaveformVisualizer } from './WaveformVisualizer';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format, addDays, startOfWeek, addWeeks } from 'date-fns';
+import { format } from 'date-fns';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { TaskDateTimePage, RepeatSettings } from './TaskDateTimePage';
 
 interface TaskInputSheetProps {
   isOpen: boolean;
@@ -53,11 +49,10 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
   const [repeatType, setRepeatType] = useState<RepeatType>('none');
   const [repeatDays, setRepeatDays] = useState<number[]>([]);
   const [folderId, setFolderId] = useState<string | undefined>();
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showDateTimePage, setShowDateTimePage] = useState(false);
   const [showPriorityMenu, setShowPriorityMenu] = useState(false);
-  const [showRepeatMenu, setShowRepeatMenu] = useState(false);
   const [showFolderDialog, setShowFolderDialog] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [repeatSettings, setRepeatSettings] = useState<RepeatSettings | undefined>();
   const [newFolderName, setNewFolderName] = useState('');
   const [selectedColor, setSelectedColor] = useState('#3b82f6');
   const [imageUrl, setImageUrl] = useState<string | undefined>();
@@ -300,47 +295,71 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
     setIsPlaying(false);
   };
 
-  const handleSetReminder = async (time: string) => {
-    const [hours, minutes] = time.split(':').map(Number);
-    const reminderDate = new Date();
-    reminderDate.setHours(hours, minutes, 0, 0);
-
-    if (reminderDate < new Date()) {
-      reminderDate.setDate(reminderDate.getDate() + 1);
-    }
-
-    // Request notification permissions
-    try {
-      const hasPermission = await notificationManager.checkPermissions();
-      if (!hasPermission) {
-        const granted = await notificationManager.requestPermissions();
-        if (!granted) {
-          toast.error('Notification permission denied. Reminders may not work.');
-        } else {
-          toast.success('Notifications enabled for reminders');
-        }
+  const handleDateTimeSave = (data: {
+    selectedDate?: Date;
+    selectedTime?: { hour: number; minute: number; period: 'AM' | 'PM' };
+    reminder?: string;
+    repeatSettings?: RepeatSettings;
+  }) => {
+    setDueDate(data.selectedDate);
+    
+    // Set reminder time based on reminder option
+    if (data.reminder && data.reminder !== 'none' && data.selectedDate) {
+      const reminderDate = new Date(data.selectedDate);
+      switch (data.reminder) {
+        case '5min':
+          reminderDate.setMinutes(reminderDate.getMinutes() - 5);
+          break;
+        case '10min':
+          reminderDate.setMinutes(reminderDate.getMinutes() - 10);
+          break;
+        case '15min':
+          reminderDate.setMinutes(reminderDate.getMinutes() - 15);
+          break;
+        case '30min':
+          reminderDate.setMinutes(reminderDate.getMinutes() - 30);
+          break;
+        case '1hour':
+          reminderDate.setHours(reminderDate.getHours() - 1);
+          break;
+        case '2hours':
+          reminderDate.setHours(reminderDate.getHours() - 2);
+          break;
+        case '1day':
+          reminderDate.setDate(reminderDate.getDate() - 1);
+          break;
       }
-    } catch (error) {
-      console.log('Running in web mode - native notifications not available');
+      setReminderTime(reminderDate);
+    } else {
+      setReminderTime(undefined);
     }
-
-    setReminderTime(reminderDate);
-    setShowTimePicker(false);
-    toast.success(`Reminder set for ${format(reminderDate, 'h:mm a')}`);
-  };
-
-  const getRepeatLabel = () => {
-    if (repeatType === 'none') return null;
-    if (repeatType === 'daily') return 'Daily';
-    if (repeatType === 'weekly') return 'Weekly';
-    if (repeatType === 'weekdays') return 'Weekdays';
-    if (repeatType === 'weekends') return 'Weekends';
-    if (repeatType === 'monthly') return 'Monthly';
-    if (repeatType === 'custom' && repeatDays.length > 0) {
-      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      return repeatDays.map(d => dayNames[d]).join(', ');
+    
+    // Set repeat settings
+    if (data.repeatSettings) {
+      setRepeatSettings(data.repeatSettings);
+      // Map to legacy repeatType for compatibility
+      switch (data.repeatSettings.frequency) {
+        case 'daily':
+          setRepeatType('daily');
+          break;
+        case 'weekly':
+          setRepeatType('weekly');
+          setRepeatDays(data.repeatSettings.weeklyDays || []);
+          break;
+        case 'monthly':
+          setRepeatType('monthly');
+          break;
+        default:
+          setRepeatType('none');
+      }
+    } else {
+      setRepeatSettings(undefined);
+      setRepeatType('none');
+      setRepeatDays([]);
     }
-    return null;
+    
+    setShowDateTimePage(false);
+    toast.success('Date & time settings saved');
   };
 
   const handleCreateFolder = async () => {
@@ -353,26 +372,6 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
     setNewFolderName('');
     setSelectedColor('#3b82f6');
     setShowFolderDialog(false);
-  };
-
-  const handleQuickDate = (type: string) => {
-    const today = new Date();
-    switch (type) {
-      case 'today':
-        setDueDate(today);
-        break;
-      case 'tomorrow':
-        setDueDate(addDays(today, 1));
-        break;
-      case 'weekend':
-        const weekend = startOfWeek(addWeeks(today, 1), { weekStartsOn: 6 });
-        setDueDate(weekend);
-        break;
-      case 'nextweek':
-        setDueDate(addWeeks(today, 1));
-        break;
-    }
-    setShowDatePicker(false);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -554,20 +553,26 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
             </div>
           )}
 
-          {repeatType !== 'none' && (
-            <div className="px-4 py-2 bg-purple-50 dark:bg-purple-950/20 rounded-lg flex items-center gap-2 mb-4">
-              <Repeat className="h-4 w-4 text-purple-500" />
-              <span className="text-sm text-purple-700 dark:text-purple-300 font-medium">
-                {getRepeatLabel()}
+          {/* Date/Time/Repeat indicator */}
+          {(dueDate || reminderTime || repeatSettings) && (
+            <div className="px-4 py-2 bg-blue-50 dark:bg-blue-950/20 rounded-lg flex items-center gap-2 mb-4">
+              <CalendarCheck className="h-4 w-4 text-blue-500" />
+              <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">
+                {dueDate ? format(dueDate, 'MMM d') : ''}
+                {reminderTime ? ` • ${format(reminderTime, 'h:mm a')}` : ''}
+                {repeatSettings ? ` • Repeats ${repeatSettings.frequency}` : ''}
               </span>
               <button
                 onClick={() => {
+                  setDueDate(undefined);
+                  setReminderTime(undefined);
+                  setRepeatSettings(undefined);
                   setRepeatType('none');
                   setRepeatDays([]);
                 }}
                 className="ml-auto"
               >
-                <X className="h-4 w-4 text-purple-500 hover:text-purple-700" />
+                <X className="h-4 w-4 text-blue-500 hover:text-blue-700" />
               </button>
             </div>
           )}
@@ -600,45 +605,24 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
             {actionItems.filter(a => a.enabled).map((action) => {
               if (action.id === 'date') {
                 return (
-                  <Popover key={action.id} open={showDatePicker} onOpenChange={setShowDatePicker}>
-                    <PopoverTrigger asChild>
-                      <button
-                        className={cn(
-                          "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all whitespace-nowrap",
-                          dueDate ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30" : "border-border bg-card hover:bg-muted"
-                        )}
-                      >
-                        {dueDate && <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full" />}
-                        {dueDate ? (
-                          <CalendarCheck className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                        ) : (
-                          <CalendarIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                        )}
-                        <span className={cn("text-sm whitespace-nowrap", dueDate ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground")}>
-                          {dueDate ? format(dueDate, 'MMM d') : 'Date'}
-                        </span>
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 bg-popover z-50" align="start">
-                      <div className="p-3 space-y-2">
-                        <div className="space-y-1">
-                          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => handleQuickDate('today')}>Today</Button>
-                          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => handleQuickDate('tomorrow')}>Tomorrow</Button>
-                          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => handleQuickDate('weekend')}>This Weekend</Button>
-                          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => handleQuickDate('nextweek')}>Next Week</Button>
-                        </div>
-                        <Separator />
-                        <Calendar
-                          mode="single"
-                          selected={dueDate}
-                          onSelect={(date) => {
-                            setDueDate(date);
-                            setShowDatePicker(false);
-                          }}
-                        />
-                      </div>
-                    </PopoverContent>
-                  </Popover>
+                  <button
+                    key={action.id}
+                    onClick={() => setShowDateTimePage(true)}
+                    className={cn(
+                      "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all whitespace-nowrap",
+                      dueDate ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30" : "border-border bg-card hover:bg-muted"
+                    )}
+                  >
+                    {dueDate && <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full" />}
+                    {dueDate ? (
+                      <CalendarCheck className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                    ) : (
+                      <CalendarIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    )}
+                    <span className={cn("text-sm whitespace-nowrap", dueDate ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground")}>
+                      {dueDate ? format(dueDate, 'MMM d') : 'Date'}
+                    </span>
+                  </button>
                 );
               }
 
@@ -697,27 +681,9 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
                 );
               }
 
-              if (action.id === 'reminder') {
-                return (
-                  <button
-                    key={action.id}
-                    className={cn(
-                      "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all whitespace-nowrap",
-                      reminderTime ? "border-purple-500 bg-purple-50 dark:bg-purple-950/30" : "border-border bg-card hover:bg-muted"
-                    )}
-                    onClick={() => setShowTimePicker(true)}
-                  >
-                    {reminderTime && <span className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full" />}
-                    {reminderTime ? (
-                      <BellRing className="h-4 w-4 text-purple-500 fill-purple-500 flex-shrink-0" />
-                    ) : (
-                      <Timer className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                    )}
-                    <span className={cn("text-sm whitespace-nowrap", reminderTime ? "text-purple-600 dark:text-purple-400" : "text-muted-foreground")}>
-                      {reminderTime ? format(reminderTime, 'h:mm a') : 'Reminders'}
-                    </span>
-                  </button>
-                );
+              // Reminder and Repeat are now handled in the Date/Time page
+              if (action.id === 'reminder' || action.id === 'repeat') {
+                return null;
               }
 
               if (action.id === 'tags') {
@@ -898,51 +864,7 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
                 );
               }
 
-              if (action.id === 'repeat') {
-                return (
-                  <Popover key={action.id} open={showRepeatMenu} onOpenChange={setShowRepeatMenu}>
-                    <PopoverTrigger asChild>
-                      <button
-                        className={cn(
-                          "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all whitespace-nowrap",
-                          repeatType !== 'none' ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30" : "border-border bg-card hover:bg-muted"
-                        )}
-                      >
-                        {repeatType !== 'none' && <span className="absolute -top-1 -right-1 w-2 h-2 bg-indigo-500 rounded-full" />}
-                        <Repeat className={cn("h-4 w-4 flex-shrink-0", repeatType !== 'none' ? "text-indigo-500" : "text-muted-foreground")} />
-                        <span className={cn("text-sm whitespace-nowrap", repeatType !== 'none' ? "text-indigo-600 dark:text-indigo-400" : "text-muted-foreground")}>
-                          {repeatType !== 'none' ? getRepeatLabel() : 'Repeat'}
-                        </span>
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-56 p-2 bg-popover z-50" align="start">
-                      {dueDate ? (
-                        <div className="space-y-1">
-                          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => { setRepeatType('daily'); setShowRepeatMenu(false); }}>
-                            <Repeat className="h-4 w-4 mr-2" />Repeat Daily
-                          </Button>
-                          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => { setRepeatType('weekly'); setShowRepeatMenu(false); }}>
-                            <Repeat className="h-4 w-4 mr-2" />Repeat Weekly
-                          </Button>
-                          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => { setRepeatType('monthly'); setShowRepeatMenu(false); }}>
-                            <Repeat className="h-4 w-4 mr-2" />Monthly
-                          </Button>
-                          {repeatType !== 'none' && (
-                            <>
-                              <Separator className="my-1" />
-                              <Button variant="ghost" size="sm" className="w-full justify-start text-red-500" onClick={() => { setRepeatType('none'); setRepeatDays([]); setShowRepeatMenu(false); }}>
-                                <X className="h-4 w-4 mr-2" />Remove Repeat
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-muted-foreground p-2">Set a due date first to enable repeat options</p>
-                      )}
-                    </PopoverContent>
-                  </Popover>
-                );
-              }
+              // Repeat section removed - now handled in TaskDateTimePage
 
               return null;
             })}
@@ -1026,51 +948,14 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
         </DialogContent>
       </Dialog>
 
-      {showTimePicker && (
-        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4">
-          <div className="bg-background rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Timer className="h-5 w-5 text-muted-foreground" />
-                Set Reminder
-              </h3>
-              <Button size="icon" variant="ghost" onClick={() => setShowTimePicker(false)} className="h-8 w-8">
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-
-            {reminderTime && (
-              <div className="mb-4 p-3 bg-cyan-50 dark:bg-cyan-950/20 rounded-lg">
-                <p className="text-sm text-muted-foreground">Current reminder:</p>
-                <p className="text-sm font-medium flex items-center gap-2 mt-1">
-                  <Clock className="h-4 w-4 text-cyan-500" />
-                  {format(reminderTime, 'h:mm a')}
-                </p>
-                <Button
-                  onClick={() => { setReminderTime(undefined); setShowTimePicker(false); }}
-                  variant="ghost"
-                  size="sm"
-                  className="mt-2 h-8 text-xs text-red-500 hover:text-red-600"
-                >
-                  Remove Reminder
-                </Button>
-              </div>
-            )}
-
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium mb-2 block">Time</label>
-                <input
-                  type="time"
-                  onChange={(e) => handleSetReminder(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg border border-border bg-background text-lg"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">You'll receive a notification at the selected time</p>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* TaskDateTimePage - Full page date/time/repeat picker */}
+      <TaskDateTimePage
+        isOpen={showDateTimePage}
+        onClose={() => setShowDateTimePage(false)}
+        onSave={handleDateTimeSave}
+        initialDate={dueDate}
+        initialRepeatSettings={repeatSettings}
+      />
 
       {/* Edit Actions Sheet */}
       <EditActionsSheet
