@@ -180,7 +180,7 @@ export const TaskItem = ({
                   className={cn(
                     "h-6 w-6 flex-shrink-0 transition-all",
                     item.completed 
-                      ? "rounded-sm border-0 bg-muted-foreground/30 data-[state=checked]:bg-muted-foreground/30 data-[state=checked]:text-muted-foreground/70" 
+                      ? "rounded-sm border-0 bg-muted-foreground/30 data-[state=checked]:bg-muted-foreground/30 data-[state=checked]:text-white" 
                       : cn("rounded-full border-2", getPriorityBorderColor(item.priority))
                   )}
                 />
