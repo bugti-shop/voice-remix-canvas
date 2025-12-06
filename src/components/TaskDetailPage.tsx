@@ -596,34 +596,7 @@ export const TaskDetailPage = ({
             </PopoverContent>
           </Popover>
 
-          {/* Repeat Task */}
-          <Popover open={showRepeatPicker} onOpenChange={setShowRepeatPicker}>
-            <PopoverTrigger asChild>
-              <button className="w-full flex items-center gap-3 py-3 hover:bg-muted/50 rounded-lg px-2 transition-colors">
-                <Repeat className="h-5 w-5 text-green-500" />
-                <span className="flex-1 text-left">Repeat Task</span>
-                <span className="text-sm text-muted-foreground capitalize">
-                  {task.repeatType === 'none' ? 'Never' : task.repeatType || 'Never'}
-                </span>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-48 z-[60]" align="start">
-              <div className="space-y-1">
-                {REPEAT_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => handleSetRepeat(option.value)}
-                    className={cn(
-                      "w-full text-left px-3 py-2 rounded-lg hover:bg-muted/50 transition-colors",
-                      task.repeatType === option.value && "bg-accent"
-                    )}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
+          {/* Repeat Task section removed - now handled in TaskDateTimePage */}
 
           {/* Convert to Notes */}
           <button 
