@@ -33,6 +33,7 @@ export interface TodoItem {
   categoryId?: string;
   googleCalendarEventId?: string;
   notificationIds?: number[];
+  voiceRecording?: VoiceRecording;
 }
 
 export interface TaskTemplate {
