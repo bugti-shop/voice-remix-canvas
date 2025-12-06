@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { TodoItem, Folder, Priority, Note } from '@/types/note';
 import { WaveformVisualizer } from '@/components/WaveformVisualizer';
-import { Play, Pause } from 'lucide-react';
+import { Play, Pause, Repeat, Check, Trash2 as TrashIcon } from 'lucide-react';
 import { Plus, FolderIcon, ChevronRight, ChevronDown, MoreVertical, Eye, EyeOff, Filter, Copy, MousePointer2, FolderPlus, Settings, LayoutList, LayoutGrid, Trash2, ListPlus, Tag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -339,6 +339,11 @@ const Today = () => {
   // Voice playback state for flat view
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
   const flatAudioRef = useRef<HTMLAudioElement | null>(null);
+  
+  // Swipe state for flat view
+  const [swipeState, setSwipeState] = useState<{ id: string; x: number; isSwiping: boolean } | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const SWIPE_THRESHOLD = 80;
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -357,7 +362,6 @@ const Today = () => {
       return;
     }
 
-    // Stop any currently playing audio
     if (flatAudioRef.current) {
       flatAudioRef.current.pause();
       flatAudioRef.current = null;
@@ -373,80 +377,158 @@ const Today = () => {
     setPlayingVoiceId(item.id);
   };
 
-  const renderTaskItem = (item: TodoItem) => (
-    viewMode === 'flat' ? (
-      <div key={item.id} className="flex items-start gap-3 py-2 px-1 border-b border-border/50">
-        {isSelectionMode && (
-          <Checkbox checked={selectedTaskIds.has(item.id)} onCheckedChange={() => handleSelectTask(item.id)} className="h-5 w-5 mt-0.5" />
-        )}
-        <Checkbox
-          checked={item.completed}
-          onCheckedChange={async (checked) => {
-            if (checked && !item.completed) {
-              try { await Haptics.impact({ style: ImpactStyle.Heavy }); } catch {}
-            }
-            updateItem(item.id, { completed: !!checked });
+  const handleFlatTouchStart = (itemId: string, e: React.TouchEvent) => {
+    touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    setSwipeState({ id: itemId, x: 0, isSwiping: false });
+  };
+
+  const handleFlatTouchMove = (itemId: string, e: React.TouchEvent) => {
+    if (!swipeState || swipeState.id !== itemId) return;
+    const deltaX = e.touches[0].clientX - touchStartRef.current.x;
+    const deltaY = Math.abs(e.touches[0].clientY - touchStartRef.current.y);
+    
+    if (deltaY < 30) {
+      const clampedX = Math.max(-120, Math.min(120, deltaX));
+      setSwipeState({ id: itemId, x: clampedX, isSwiping: true });
+    }
+  };
+
+  const handleFlatTouchEnd = async (item: TodoItem) => {
+    if (!swipeState || swipeState.id !== item.id) return;
+    
+    if (swipeState.x < -SWIPE_THRESHOLD) {
+      try { await Haptics.impact({ style: ImpactStyle.Medium }); } catch {}
+      deleteItem(item.id);
+    } else if (swipeState.x > SWIPE_THRESHOLD) {
+      try { await Haptics.impact({ style: ImpactStyle.Heavy }); } catch {}
+      updateItem(item.id, { completed: !item.completed });
+    }
+    setSwipeState(null);
+  };
+
+  const renderTaskItem = (item: TodoItem) => {
+    const hasSubtasks = item.subtasks && item.subtasks.length > 0;
+    const currentSwipe = swipeState?.id === item.id ? swipeState : null;
+    
+    return viewMode === 'flat' ? (
+      <div key={item.id} className="relative overflow-hidden">
+        {/* Swipe action backgrounds */}
+        <div className="absolute inset-0 flex">
+          <div className={cn(
+            "flex-1 flex items-center justify-start pl-4 transition-colors",
+            currentSwipe && currentSwipe.x > SWIPE_THRESHOLD ? "bg-green-500" : "bg-green-500/70"
+          )}>
+            <Check className="h-5 w-5 text-white" />
+          </div>
+          <div className={cn(
+            "flex-1 flex items-center justify-end pr-4 transition-colors",
+            currentSwipe && currentSwipe.x < -SWIPE_THRESHOLD ? "bg-red-500" : "bg-red-500/70"
+          )}>
+            <TrashIcon className="h-5 w-5 text-white" />
+          </div>
+        </div>
+        
+        {/* Main flat item */}
+        <div 
+          className="flex items-start gap-3 py-2.5 px-2 border-b border-border/50 bg-background"
+          style={{ 
+            transform: `translateX(${currentSwipe?.x || 0}px)`, 
+            transition: currentSwipe?.isSwiping ? 'none' : 'transform 0.3s ease-out' 
           }}
-          className={cn(
-            "h-5 w-5 rounded-sm border-2 mt-0.5",
-            item.completed 
-              ? "border-muted-foreground/50" 
-              : getPriorityBorderColor(item.priority)
+          onTouchStart={(e) => handleFlatTouchStart(item.id, e)}
+          onTouchMove={(e) => handleFlatTouchMove(item.id, e)}
+          onTouchEnd={() => handleFlatTouchEnd(item)}
+        >
+          {isSelectionMode && (
+            <Checkbox checked={selectedTaskIds.has(item.id)} onCheckedChange={() => handleSelectTask(item.id)} className="h-5 w-5 mt-0.5" />
           )}
-        />
-        <div className="flex-1 min-w-0" onClick={() => setSelectedTask(item)}>
-          {/* Show voice player OR text based on whether it's a voice task */}
-          {item.voiceRecording ? (
-            <button
-              onClick={(e) => handleFlatVoicePlay(item, e)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
-            >
-              {playingVoiceId === item.id ? (
-                <Pause className="h-4 w-4 text-primary flex-shrink-0" />
-              ) : (
-                <Play className="h-4 w-4 text-primary flex-shrink-0" />
-              )}
-              <WaveformVisualizer 
-                isActive={playingVoiceId === item.id} 
-                barCount={16}
-                color="hsl(var(--primary))"
-                className="h-5 w-20"
-              />
-              <span className="text-xs text-primary font-medium">
-                {formatDuration(item.voiceRecording.duration)}
-              </span>
-            </button>
-          ) : (
-            <span className={cn("text-sm block", item.completed && "text-muted-foreground")}>
-              {item.text}
-            </span>
-          )}
-          {item.coloredTags && item.coloredTags.length > 0 && !item.voiceRecording && (
-            <div className="flex items-center gap-1 mt-1 flex-wrap">
-              {item.coloredTags.slice(0, 4).map((tag) => (
-                <span 
-                  key={tag.name}
-                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded-full"
-                  style={{ 
-                    backgroundColor: `${tag.color}20`, 
-                    color: tag.color 
-                  }}
+          <Checkbox
+            checked={item.completed}
+            onCheckedChange={async (checked) => {
+              updateItem(item.id, { completed: !!checked });
+              if (checked && !item.completed) {
+                try { await Haptics.impact({ style: ImpactStyle.Heavy }); } catch {}
+              }
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className={cn(
+              "h-5 w-5 rounded-sm border-2 mt-0.5 flex-shrink-0",
+              item.completed 
+                ? "border-muted-foreground/50" 
+                : getPriorityBorderColor(item.priority)
+            )}
+          />
+          <div className="flex-1 min-w-0" onClick={() => !currentSwipe?.isSwiping && setSelectedTask(item)}>
+            {/* Show voice player OR text based on whether it's a voice task */}
+            {item.voiceRecording ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={(e) => handleFlatVoicePlay(item, e)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
                 >
-                  <Tag className="h-2.5 w-2.5" />
-                  {tag.name}
-                </span>
-              ))}
-              {item.coloredTags.length > 4 && (
-                <span className="text-[10px] text-muted-foreground">+{item.coloredTags.length - 4}</span>
-              )}
+                  {playingVoiceId === item.id ? (
+                    <Pause className="h-4 w-4 text-primary flex-shrink-0" />
+                  ) : (
+                    <Play className="h-4 w-4 text-primary flex-shrink-0" />
+                  )}
+                  <WaveformVisualizer 
+                    isActive={playingVoiceId === item.id} 
+                    barCount={16}
+                    color="hsl(var(--primary))"
+                    className="h-5 w-20"
+                  />
+                  <span className="text-xs text-primary font-medium">
+                    {formatDuration(item.voiceRecording.duration)}
+                  </span>
+                </button>
+                {item.repeatType && item.repeatType !== 'none' && <Repeat className="h-3 w-3 text-purple-500 flex-shrink-0" />}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className={cn("text-sm", item.completed && "text-muted-foreground")}>{item.text}</span>
+                {item.repeatType && item.repeatType !== 'none' && <Repeat className="h-3 w-3 text-purple-500 flex-shrink-0" />}
+              </div>
+            )}
+            {/* Tags display */}
+            {item.coloredTags && item.coloredTags.length > 0 && (
+              <div className="flex items-center gap-1 mt-1 flex-wrap">
+                {item.coloredTags.slice(0, 4).map((tag) => (
+                  <span 
+                    key={tag.name}
+                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded-full"
+                    style={{ backgroundColor: `${tag.color}20`, color: tag.color }}
+                  >
+                    <Tag className="h-2.5 w-2.5" />
+                    {tag.name}
+                  </span>
+                ))}
+                {item.coloredTags.length > 4 && (
+                  <span className="text-[10px] text-muted-foreground">+{item.coloredTags.length - 4}</span>
+                )}
+              </div>
+            )}
+            {/* Subtasks indicator */}
+            {hasSubtasks && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {item.subtasks!.filter(st => st.completed).length}/{item.subtasks!.length} subtasks
+              </p>
+            )}
+          </div>
+          {/* Image display */}
+          {item.imageUrl && (
+            <div
+              className="w-10 h-10 rounded-full overflow-hidden border-2 border-border flex-shrink-0 cursor-pointer hover:border-primary transition-colors"
+              onClick={(e) => { e.stopPropagation(); setSelectedImage(item.imageUrl!); }}
+            >
+              <img src={item.imageUrl} alt="Task attachment" className="w-full h-full object-cover" />
             </div>
           )}
         </div>
       </div>
     ) : (
       <TaskItem key={item.id} item={item} onUpdate={updateItem} onDelete={deleteItem} onTaskClick={setSelectedTask} onImageClick={setSelectedImage} isSelected={selectedTaskIds.has(item.id)} isSelectionMode={isSelectionMode} onSelect={handleSelectTask} />
-    )
-  );
+    );
+  };
 
   return (
     <TodoLayout title="Today">
