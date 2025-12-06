@@ -3,12 +3,10 @@ import { TodoItem, Priority, Folder, Note, RepeatType, ColoredTag } from '@/type
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import {
-  ArrowLeft,
   FolderIcon,
   ChevronDown,
   MoreVertical,
@@ -19,9 +17,6 @@ import {
   Trash2,
   Plus,
   Calendar as CalendarIcon,
-  Clock,
-  Bell,
-  Repeat,
   FileText,
   Paperclip,
   Tag,
@@ -33,6 +28,8 @@ import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { WaveformVisualizer } from './WaveformVisualizer';
 import { Play, Pause } from 'lucide-react';
+import { TaskDateTimePage, RepeatSettings } from './TaskDateTimePage';
+import { notificationManager } from '@/utils/notifications';
 
 interface TaskDetailPageProps {
   isOpen: boolean;
@@ -51,14 +48,6 @@ const TAG_COLORS = [
   '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'
 ];
 
-const REPEAT_OPTIONS: { value: RepeatType; label: string }[] = [
-  { value: 'none', label: 'Never' },
-  { value: 'daily', label: 'Daily' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'weekdays', label: 'Weekdays' },
-  { value: 'weekends', label: 'Weekends' },
-  { value: 'monthly', label: 'Monthly' },
-];
 
 export const TaskDetailPage = ({
   isOpen,
@@ -74,14 +63,13 @@ export const TaskDetailPage = ({
   const [title, setTitle] = useState('');
   const [newSubtaskText, setNewSubtaskText] = useState('');
   const [showSubtaskInput, setShowSubtaskInput] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showDeadlinePicker, setShowDeadlinePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
-  const [showRepeatPicker, setShowRepeatPicker] = useState(false);
+  const [showDateTimePage, setShowDateTimePage] = useState(false);
   const [showTagInput, setShowTagInput] = useState(false);
   const [newTagName, setNewTagName] = useState('');
   const [newTagColor, setNewTagColor] = useState(TAG_COLORS[0]);
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+  const [reminderOffset, setReminderOffset] = useState<string>('');
+  const [repeatSettings, setRepeatSettings] = useState<RepeatSettings | undefined>();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const subtaskInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -181,37 +169,57 @@ export const TaskDetailPage = ({
     });
   };
 
-  const handleSetDate = (date: Date | undefined) => {
-    onUpdate({ ...task, dueDate: date });
-    setShowDatePicker(false);
-    if (date) toast.success(`Date set to ${format(date, 'MMM d, yyyy')}`);
-  };
-
-  const handleSetDeadline = (date: Date | undefined) => {
-    // Using dueDate for deadline as well - you could add a separate deadline field if needed
-    onUpdate({ ...task, dueDate: date });
-    setShowDeadlinePicker(false);
-    if (date) toast.success(`Deadline set to ${format(date, 'MMM d, yyyy')}`);
-  };
-
-  const handleSetReminder = (time: string) => {
-    const [hours, minutes] = time.split(':').map(Number);
-    const reminderDate = new Date();
-    reminderDate.setHours(hours, minutes, 0, 0);
-
-    if (reminderDate < new Date()) {
-      reminderDate.setDate(reminderDate.getDate() + 1);
+  const handleDateTimeSave = async (data: {
+    selectedDate?: Date;
+    selectedTime?: { hour: number; minute: number; period: 'AM' | 'PM' };
+    reminder?: string;
+    repeatSettings?: RepeatSettings;
+  }) => {
+    try { await Haptics.impact({ style: ImpactStyle.Light }); } catch {}
+    
+    let reminderTime: Date | undefined;
+    
+    if (data.selectedDate && data.selectedTime) {
+      reminderTime = new Date(data.selectedDate);
+      let hours = data.selectedTime.hour;
+      if (data.selectedTime.period === 'PM' && hours !== 12) hours += 12;
+      if (data.selectedTime.period === 'AM' && hours === 12) hours = 0;
+      reminderTime.setHours(hours, data.selectedTime.minute, 0, 0);
     }
 
-    onUpdate({ ...task, reminderTime: reminderDate });
-    setShowTimePicker(false);
-    toast.success(`Reminder set for ${format(reminderDate, 'h:mm a')}`);
-  };
+    const updatedTask: TodoItem = {
+      ...task,
+      dueDate: data.selectedDate,
+      reminderTime,
+      repeatType: data.repeatSettings?.frequency as any || 'none',
+    };
 
-  const handleSetRepeat = (repeatType: RepeatType) => {
-    onUpdate({ ...task, repeatType });
-    setShowRepeatPicker(false);
-    toast.success(`Repeat set to ${repeatType}`);
+    onUpdate(updatedTask);
+    
+    // Store reminder offset and repeat settings for notification scheduling
+    setReminderOffset(data.reminder || '');
+    setRepeatSettings(data.repeatSettings);
+
+    // Schedule notification
+    try {
+      const notificationIds = await notificationManager.scheduleTaskReminder(
+        updatedTask,
+        data.reminder,
+        data.repeatSettings
+      );
+      
+      if (notificationIds.length > 0) {
+        onUpdate({ ...updatedTask, notificationIds });
+        toast.success('Date, time, and reminder saved!');
+      } else if (data.selectedDate) {
+        toast.success('Date saved!');
+      }
+    } catch (error) {
+      console.error('Error scheduling notification:', error);
+      toast.success('Date saved (notification scheduling not available)');
+    }
+
+    setShowDateTimePage(false);
   };
 
   const handleConvertToNote = () => {
@@ -515,88 +523,19 @@ export const TaskDetailPage = ({
 
         {/* Action Items */}
         <div className="space-y-1 border-t border-border pt-4">
-          {/* Date */}
-          <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
-            <PopoverTrigger asChild>
-              <button className="w-full flex items-center gap-3 py-3 hover:bg-muted/50 rounded-lg px-2 transition-colors">
-                <CalendarIcon className="h-5 w-5 text-cyan-500" />
-                <span className="flex-1 text-left">Date</span>
-                <span className="text-sm text-muted-foreground">
-                  {task.dueDate ? format(new Date(task.dueDate), 'MMM d, yyyy') : 'Not set'}
-                </span>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0 z-[60]" align="start">
-              <Calendar
-                mode="single"
-                selected={task.dueDate ? new Date(task.dueDate) : undefined}
-                onSelect={handleSetDate}
-                initialFocus
-                className="pointer-events-auto"
-              />
-            </PopoverContent>
-          </Popover>
-
-          {/* Deadline */}
-          <Popover open={showDeadlinePicker} onOpenChange={setShowDeadlinePicker}>
-            <PopoverTrigger asChild>
-              <button className="w-full flex items-center gap-3 py-3 hover:bg-muted/50 rounded-lg px-2 transition-colors">
-                <Clock className="h-5 w-5 text-orange-500" />
-                <span className="flex-1 text-left">Deadline</span>
-                <span className="text-sm text-muted-foreground">
-                  {task.dueDate ? format(new Date(task.dueDate), 'MMM d, yyyy') : 'Not set'}
-                </span>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0 z-[60]" align="start">
-              <Calendar
-                mode="single"
-                selected={task.dueDate ? new Date(task.dueDate) : undefined}
-                onSelect={handleSetDeadline}
-                initialFocus
-                className="pointer-events-auto"
-              />
-            </PopoverContent>
-          </Popover>
-
-          {/* Time & Reminder */}
-          <Popover open={showTimePicker} onOpenChange={setShowTimePicker}>
-            <PopoverTrigger asChild>
-              <button className="w-full flex items-center gap-3 py-3 hover:bg-muted/50 rounded-lg px-2 transition-colors">
-                <Bell className="h-5 w-5 text-purple-500" />
-                <span className="flex-1 text-left">Time & Reminder</span>
-                <span className="text-sm text-muted-foreground">
-                  {task.reminderTime ? format(new Date(task.reminderTime), 'h:mm a') : 'Not set'}
-                </span>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-64 z-[60]" align="start">
-              <div className="space-y-3">
-                <label className="text-sm font-medium">Set Reminder Time</label>
-                <input
-                  type="time"
-                  onChange={(e) => handleSetReminder(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-background"
-                />
-                {task.reminderTime && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="w-full text-destructive"
-                    onClick={() => {
-                      onUpdate({ ...task, reminderTime: undefined });
-                      setShowTimePicker(false);
-                      toast.success('Reminder removed');
-                    }}
-                  >
-                    Remove Reminder
-                  </Button>
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          {/* Repeat Task section removed - now handled in TaskDateTimePage */}
+          {/* Date - Opens TaskDateTimePage */}
+          <button 
+            onClick={() => setShowDateTimePage(true)}
+            className="w-full flex items-center gap-3 py-3 hover:bg-muted/50 rounded-lg px-2 transition-colors"
+          >
+            <CalendarIcon className="h-5 w-5 text-cyan-500" />
+            <span className="flex-1 text-left">Date, Time & Reminder</span>
+            <span className="text-sm text-muted-foreground">
+              {task.dueDate 
+                ? `${format(new Date(task.dueDate), 'MMM d')}${task.reminderTime ? ` • ${format(new Date(task.reminderTime), 'h:mm a')}` : ''}`
+                : 'Not set'}
+            </span>
+          </button>
 
           {/* Convert to Notes */}
           <button 
@@ -687,6 +626,21 @@ export const TaskDetailPage = ({
 
       {/* Safe area padding for bottom */}
       <div style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 16px)' }} />
+
+      {/* TaskDateTimePage */}
+      <TaskDateTimePage
+        isOpen={showDateTimePage}
+        onClose={() => setShowDateTimePage(false)}
+        onSave={handleDateTimeSave}
+        initialDate={task.dueDate ? new Date(task.dueDate) : undefined}
+        initialTime={task.reminderTime ? {
+          hour: new Date(task.reminderTime).getHours() % 12 || 12,
+          minute: new Date(task.reminderTime).getMinutes(),
+          period: new Date(task.reminderTime).getHours() >= 12 ? 'PM' : 'AM'
+        } : undefined}
+        initialReminder={reminderOffset}
+        initialRepeatSettings={repeatSettings}
+      />
     </div>
   );
 };
