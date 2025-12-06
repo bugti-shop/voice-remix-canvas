@@ -23,11 +23,9 @@ import {
   BellRing,
   Tag,
   CalendarClock,
-  ListOrdered,
-  GripVertical,
-  ChevronUp,
-  ChevronDown
+  Settings2
 } from 'lucide-react';
+import { EditActionsSheet, ActionItem, defaultActions } from './EditActionsSheet';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format, addDays, startOfWeek, addWeeks } from 'date-fns';
@@ -41,11 +39,9 @@ interface TaskInputSheetProps {
   folders: Folder[];
   selectedFolderId?: string | null;
   onCreateFolder: (name: string, color: string) => void;
-  existingTasks?: TodoItem[];
-  onReorderTasks?: (tasks: TodoItem[]) => void;
 }
 
-export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFolderId, onCreateFolder, existingTasks = [], onReorderTasks }: TaskInputSheetProps) => {
+export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFolderId, onCreateFolder }: TaskInputSheetProps) => {
   const [taskText, setTaskText] = useState('');
   const [priority, setPriority] = useState<Priority>('none');
   const [dueDate, setDueDate] = useState<Date | undefined>();
@@ -66,12 +62,24 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
   const [showTagInput, setShowTagInput] = useState(false);
   const [deadline, setDeadline] = useState<Date | undefined>();
   const [showDeadlinePicker, setShowDeadlinePicker] = useState(false);
-  const [showReorderSheet, setShowReorderSheet] = useState(false);
-  const [reorderTasks, setReorderTasks] = useState<TodoItem[]>([]);
+  const [showEditActions, setShowEditActions] = useState(false);
+  const [actionItems, setActionItems] = useState<ActionItem[]>(() => {
+    const saved = localStorage.getItem('taskInputActions');
+    return saved ? JSON.parse(saved) : defaultActions;
+  });
   const inputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   const folderColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+
+  const handleSaveActions = (actions: ActionItem[]) => {
+    setActionItems(actions);
+    localStorage.setItem('taskInputActions', JSON.stringify(actions));
+    toast.success('Actions updated');
+  };
+
+  const isActionEnabled = (id: string) => actionItems.find(a => a.id === id)?.enabled ?? true;
+  const getActionOrder = () => actionItems.filter(a => a.enabled).map(a => a.id);
 
   useEffect(() => {
     if (!isOpen) {
@@ -215,36 +223,6 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
 
   const handleRemoveTag = (tag: string) => {
     setTags(tags.filter(t => t !== tag));
-  };
-
-  const handleOpenReorder = () => {
-    setReorderTasks([...existingTasks]);
-    setShowReorderSheet(true);
-  };
-
-  const handleMoveTaskUp = (index: number) => {
-    if (index === 0) return;
-    const newTasks = [...reorderTasks];
-    [newTasks[index - 1], newTasks[index]] = [newTasks[index], newTasks[index - 1]];
-    setReorderTasks(newTasks);
-  };
-
-  const handleMoveTaskDown = (index: number) => {
-    if (index === reorderTasks.length - 1) return;
-    const newTasks = [...reorderTasks];
-    [newTasks[index], newTasks[index + 1]] = [newTasks[index + 1], newTasks[index]];
-    setReorderTasks(newTasks);
-  };
-
-  const handleSaveReorder = async () => {
-    try {
-      await Haptics.impact({ style: ImpactStyle.Light });
-    } catch {}
-    if (onReorderTasks) {
-      onReorderTasks(reorderTasks);
-    }
-    setShowReorderSheet(false);
-    toast.success('Tasks reordered successfully');
   };
 
   if (!isOpen) return null;
@@ -515,16 +493,14 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
               </PopoverContent>
             </Popover>
 
-            {/* Edit Tasks (Reorder) Button */}
-            {existingTasks.length > 0 && (
-              <button
-                className="relative flex items-center gap-1.5 px-3 py-2 rounded-md border border-border bg-card hover:bg-muted transition-all"
-                onClick={handleOpenReorder}
-              >
-                <ListOrdered className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Edit Tasks</span>
-              </button>
-            )}
+            {/* Edit Actions Button */}
+            <button
+              className="relative flex items-center gap-1.5 px-3 py-2 rounded-md border border-border bg-card hover:bg-muted transition-all"
+              onClick={() => setShowEditActions(true)}
+            >
+              <Settings2 className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Edit Actions</span>
+            </button>
 
             <Popover>
               <PopoverTrigger asChild>
@@ -696,57 +672,13 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
         </div>
       )}
 
-      {/* Reorder Tasks Sheet */}
-      {showReorderSheet && (
-        <div className="fixed inset-0 bg-black/50 z-[70] flex items-end justify-center">
-          <div className="bg-background rounded-t-2xl w-full max-w-lg shadow-2xl animate-in slide-in-from-bottom duration-300">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <ListOrdered className="h-5 w-5 text-muted-foreground" />
-                Reorder Tasks
-              </h3>
-              <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={() => setShowReorderSheet(false)}>Cancel</Button>
-                <Button size="sm" onClick={handleSaveReorder}>Save</Button>
-              </div>
-            </div>
-            <div className="max-h-[60vh] overflow-y-auto p-4">
-              {reorderTasks.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">No tasks to reorder</p>
-              ) : (
-                <div className="space-y-2">
-                  {reorderTasks.filter(t => !t.completed).map((task, index) => (
-                    <div key={task.id} className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg border border-border">
-                      <GripVertical className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                      <span className="flex-1 text-sm truncate">{task.text}</span>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => handleMoveTaskUp(index)}
-                          disabled={index === 0}
-                        >
-                          <ChevronUp className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => handleMoveTaskDown(index)}
-                          disabled={index === reorderTasks.filter(t => !t.completed).length - 1}
-                        >
-                          <ChevronDown className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Edit Actions Sheet */}
+      <EditActionsSheet
+        isOpen={showEditActions}
+        onClose={() => setShowEditActions(false)}
+        actions={actionItems}
+        onSave={handleSaveActions}
+      />
     </>
   );
 };
