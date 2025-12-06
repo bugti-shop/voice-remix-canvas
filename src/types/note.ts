@@ -10,6 +10,11 @@ export interface Category {
   icon?: string;
 }
 
+export interface ColoredTag {
+  name: string;
+  color: string;
+}
+
 export interface TodoItem {
   id: string;
   text: string;
@@ -20,6 +25,7 @@ export interface TodoItem {
   repeatType?: RepeatType;
   repeatDays?: number[];
   tags?: string[];
+  coloredTags?: ColoredTag[];
   folderId?: string;
   imageUrl?: string;
   description?: string;

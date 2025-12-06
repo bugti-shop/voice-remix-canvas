@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { TodoItem, Priority, RepeatType, Folder } from '@/types/note';
+import { TodoItem, Priority, RepeatType, Folder, ColoredTag } from '@/types/note';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -57,8 +57,9 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
   const [newFolderName, setNewFolderName] = useState('');
   const [selectedColor, setSelectedColor] = useState('#3b82f6');
   const [imageUrl, setImageUrl] = useState<string | undefined>();
-  const [tags, setTags] = useState<string[]>([]);
+  const [coloredTags, setColoredTags] = useState<ColoredTag[]>([]);
   const [tagInput, setTagInput] = useState('');
+  const [selectedTagColor, setSelectedTagColor] = useState('#14b8a6');
   const [showTagInput, setShowTagInput] = useState(false);
   const [deadline, setDeadline] = useState<Date | undefined>();
   const [showDeadlinePicker, setShowDeadlinePicker] = useState(false);
@@ -91,8 +92,9 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
       setRepeatDays([]);
       setFolderId(undefined);
       setImageUrl(undefined);
-      setTags([]);
+      setColoredTags([]);
       setTagInput('');
+      setSelectedTagColor('#14b8a6');
       setShowTagInput(false);
       setDeadline(undefined);
     }
@@ -120,7 +122,7 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
       repeatDays: repeatType === 'custom' && repeatDays.length > 0 ? repeatDays : undefined,
       folderId,
       imageUrl,
-      tags: tags.length > 0 ? tags : undefined,
+      coloredTags: coloredTags.length > 0 ? coloredTags : undefined,
     };
 
     onAddTask(mainTask);
@@ -214,16 +216,18 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
     }
   };
 
+  const tagColors = ['#14b8a6', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#ef4444', '#10b981', '#6366f1'];
+
   const handleAddTag = () => {
-    if (tagInput.trim() && !tags.includes(tagInput.trim())) {
-      setTags([...tags, tagInput.trim()]);
+    if (tagInput.trim() && !coloredTags.some(t => t.name === tagInput.trim())) {
+      setColoredTags([...coloredTags, { name: tagInput.trim(), color: selectedTagColor }]);
       setTagInput('');
       setShowTagInput(false);
     }
   };
 
-  const handleRemoveTag = (tag: string) => {
-    setTags(tags.filter(t => t !== tag));
+  const handleRemoveTag = (tagName: string) => {
+    setColoredTags(coloredTags.filter(t => t.name !== tagName));
   };
 
   if (!isOpen) return null;
@@ -293,14 +297,22 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
           )}
 
           {/* Tags display */}
-          {tags.length > 0 && (
+          {coloredTags.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-3">
-              {tags.map((tag) => (
-                <span key={tag} className="inline-flex items-center gap-1 px-2 py-1 bg-teal-50 dark:bg-teal-950/30 text-teal-600 dark:text-teal-400 text-xs rounded-full border border-teal-200 dark:border-teal-800">
+              {coloredTags.map((tag) => (
+                <span 
+                  key={tag.name} 
+                  className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full border"
+                  style={{ 
+                    backgroundColor: `${tag.color}15`, 
+                    borderColor: `${tag.color}40`,
+                    color: tag.color 
+                  }}
+                >
                   <Tag className="h-3 w-3" />
-                  {tag}
-                  <button onClick={() => handleRemoveTag(tag)}>
-                    <X className="h-3 w-3 hover:text-teal-800" />
+                  {tag.name}
+                  <button onClick={() => handleRemoveTag(tag.name)}>
+                    <X className="h-3 w-3 hover:opacity-70" />
                   </button>
                 </span>
               ))}
@@ -423,17 +435,17 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
                 <button
                   className={cn(
                     "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
-                    tags.length > 0 ? "border-teal-500 bg-teal-50 dark:bg-teal-950/30" : "border-border bg-card hover:bg-muted"
+                    coloredTags.length > 0 ? "border-teal-500 bg-teal-50 dark:bg-teal-950/30" : "border-border bg-card hover:bg-muted"
                   )}
                 >
-                  {tags.length > 0 && <span className="absolute -top-1 -right-1 w-2 h-2 bg-teal-500 rounded-full" />}
-                  <Tag className={cn("h-4 w-4", tags.length > 0 ? "text-teal-500" : "text-muted-foreground")} />
-                  <span className={cn("text-sm", tags.length > 0 ? "text-teal-600 dark:text-teal-400" : "text-muted-foreground")}>
-                    {tags.length > 0 ? `${tags.length} Tag${tags.length > 1 ? 's' : ''}` : 'Tags'}
+                  {coloredTags.length > 0 && <span className="absolute -top-1 -right-1 w-2 h-2 bg-teal-500 rounded-full" />}
+                  <Tag className={cn("h-4 w-4", coloredTags.length > 0 ? "text-teal-500" : "text-muted-foreground")} />
+                  <span className={cn("text-sm", coloredTags.length > 0 ? "text-teal-600 dark:text-teal-400" : "text-muted-foreground")}>
+                    {coloredTags.length > 0 ? `${coloredTags.length} Tag${coloredTags.length > 1 ? 's' : ''}` : 'Tags'}
                   </span>
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-64 p-3 bg-popover z-50" align="start">
+              <PopoverContent className="w-72 p-3 bg-popover z-50" align="start">
                 <div className="space-y-3">
                   <div className="flex gap-2">
                     <Input
@@ -441,16 +453,39 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
                       value={tagInput}
                       onChange={(e) => setTagInput(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(); } }}
-                      className="h-9 text-sm"
+                      className="h-9 text-sm flex-1"
                     />
                     <Button size="sm" onClick={handleAddTag} disabled={!tagInput.trim()}>Add</Button>
                   </div>
-                  {tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {tags.map((tag) => (
-                        <span key={tag} className="inline-flex items-center gap-1 px-2 py-1 bg-teal-50 dark:bg-teal-950/30 text-teal-600 dark:text-teal-400 text-xs rounded-full">
-                          {tag}
-                          <button onClick={() => handleRemoveTag(tag)}><X className="h-3 w-3" /></button>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">Tag color</p>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {tagColors.map((color) => (
+                        <button
+                          key={color}
+                          onClick={() => setSelectedTagColor(color)}
+                          className={cn(
+                            "w-7 h-7 rounded-full transition-all",
+                            selectedTagColor === color && "ring-2 ring-offset-2 ring-primary"
+                          )}
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  {coloredTags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-2 border-t">
+                      {coloredTags.map((tag) => (
+                        <span 
+                          key={tag.name} 
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full"
+                          style={{ 
+                            backgroundColor: `${tag.color}20`, 
+                            color: tag.color 
+                          }}
+                        >
+                          {tag.name}
+                          <button onClick={() => handleRemoveTag(tag.name)}><X className="h-3 w-3" /></button>
                         </span>
                       ))}
                     </div>
