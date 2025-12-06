@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { 
   X, 
   GripVertical, 
-  ChevronUp, 
-  ChevronDown,
   Calendar as CalendarIcon,
   Flag,
   Timer,
@@ -51,18 +50,14 @@ export const EditActionsSheet = ({ isOpen, onClose, actions, onSave }: EditActio
     setLocalActions(actions);
   }, [actions]);
 
-  const handleMoveUp = (index: number) => {
-    if (index === 0) return;
-    const newActions = [...localActions];
-    [newActions[index - 1], newActions[index]] = [newActions[index], newActions[index - 1]];
-    setLocalActions(newActions);
-  };
-
-  const handleMoveDown = (index: number) => {
-    if (index === localActions.length - 1) return;
-    const newActions = [...localActions];
-    [newActions[index], newActions[index + 1]] = [newActions[index + 1], newActions[index]];
-    setLocalActions(newActions);
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+    
+    const items = Array.from(localActions);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+    
+    setLocalActions(items);
   };
 
   const handleToggle = (id: string) => {
@@ -105,67 +100,68 @@ export const EditActionsSheet = ({ isOpen, onClose, actions, onSave }: EditActio
 
       {/* Actions List */}
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="max-w-lg mx-auto space-y-2">
+        <div className="max-w-lg mx-auto">
           <p className="text-sm text-muted-foreground mb-4 flex items-center gap-2">
             <Settings2 className="h-4 w-4" />
             Drag to reorder. Toggle to show/hide actions.
           </p>
 
-          {localActions.map((action, index) => {
-            const Icon = action.icon;
-            return (
-              <div 
-                key={action.id} 
-                className={cn(
-                  "flex items-center gap-3 p-4 rounded-xl border transition-all",
-                  action.enabled 
-                    ? "bg-card border-border" 
-                    : "bg-muted/30 border-border/50 opacity-60"
-                )}
-              >
-                <GripVertical className="h-5 w-5 text-muted-foreground flex-shrink-0 cursor-grab" />
-                
-                <div className={cn("p-2 rounded-lg", action.enabled ? "bg-muted" : "bg-muted/50")}>
-                  <Icon className={cn("h-5 w-5", action.enabled ? action.color : "text-muted-foreground")} />
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <Droppable droppableId="actions">
+              {(provided) => (
+                <div
+                  {...provided.droppableProps}
+                  ref={provided.innerRef}
+                  className="space-y-2"
+                >
+                  {localActions.map((action, index) => {
+                    const Icon = action.icon;
+                    return (
+                      <Draggable key={action.id} draggableId={action.id} index={index}>
+                        {(provided, snapshot) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            className={cn(
+                              "flex items-center gap-3 p-4 rounded-xl border transition-all",
+                              action.enabled 
+                                ? "bg-card border-border" 
+                                : "bg-muted/30 border-border/50 opacity-60",
+                              snapshot.isDragging && "shadow-lg ring-2 ring-primary/20"
+                            )}
+                          >
+                            <div
+                              {...provided.dragHandleProps}
+                              className="touch-none"
+                            >
+                              <GripVertical className="h-5 w-5 text-muted-foreground flex-shrink-0 cursor-grab active:cursor-grabbing" />
+                            </div>
+                            
+                            <div className={cn("p-2 rounded-lg", action.enabled ? "bg-muted" : "bg-muted/50")}>
+                              <Icon className={cn("h-5 w-5", action.enabled ? action.color : "text-muted-foreground")} />
+                            </div>
+
+                            <span className={cn(
+                              "flex-1 font-medium",
+                              !action.enabled && "text-muted-foreground"
+                            )}>
+                              {action.name}
+                            </span>
+
+                            <Switch 
+                              checked={action.enabled} 
+                              onCheckedChange={() => handleToggle(action.id)}
+                            />
+                          </div>
+                        )}
+                      </Draggable>
+                    );
+                  })}
+                  {provided.placeholder}
                 </div>
-
-                <span className={cn(
-                  "flex-1 font-medium",
-                  !action.enabled && "text-muted-foreground"
-                )}>
-                  {action.name}
-                </span>
-
-                <div className="flex items-center gap-2">
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => handleMoveUp(index)}
-                      disabled={index === 0}
-                    >
-                      <ChevronUp className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => handleMoveDown(index)}
-                      disabled={index === localActions.length - 1}
-                    >
-                      <ChevronDown className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  <Switch 
-                    checked={action.enabled} 
-                    onCheckedChange={() => handleToggle(action.id)}
-                  />
-                </div>
-              </div>
-            );
-          })}
+              )}
+            </Droppable>
+          </DragDropContext>
         </div>
       </div>
 
