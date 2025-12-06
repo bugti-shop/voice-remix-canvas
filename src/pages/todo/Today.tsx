@@ -576,6 +576,7 @@ const Today = () => {
     const isExpanded = expandedTasks.has(item.id);
     const completedSubtasks = item.subtasks?.filter(st => st.completed).length || 0;
     const totalSubtasks = item.subtasks?.length || 0;
+    const taskSection = sections.find(s => s.id === item.sectionId);
     
     return viewMode === 'flat' ? (
       <div key={item.id} className="relative">
@@ -658,24 +659,41 @@ const Today = () => {
                   {item.repeatType && item.repeatType !== 'none' && <Repeat className="h-3 w-3 text-purple-500 flex-shrink-0" />}
                 </div>
               )}
-              {/* Tags display */}
-              {item.coloredTags && item.coloredTags.length > 0 && (
-                <div className="flex items-center gap-1 mt-1 flex-wrap">
-                  {item.coloredTags.slice(0, 4).map((tag) => (
-                    <span 
-                      key={tag.name}
-                      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded-full"
-                      style={{ backgroundColor: `${tag.color}20`, color: tag.color }}
-                    >
-                      <Tag className="h-2.5 w-2.5" />
-                      {tag.name}
-                    </span>
-                  ))}
-                  {item.coloredTags.length > 4 && (
-                    <span className="text-[10px] text-muted-foreground">+{item.coloredTags.length - 4}</span>
-                  )}
-                </div>
-              )}
+              {/* Section indicator and Tags display */}
+              <div className="flex items-center gap-1 mt-1 flex-wrap">
+                {/* Section indicator */}
+                {taskSection && (
+                  <span 
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full border"
+                    style={{ 
+                      backgroundColor: `${taskSection.color}15`, 
+                      borderColor: `${taskSection.color}40`,
+                      color: taskSection.color 
+                    }}
+                  >
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: taskSection.color }} />
+                    {taskSection.name}
+                  </span>
+                )}
+                {/* Tags display */}
+                {item.coloredTags && item.coloredTags.length > 0 && (
+                  <>
+                    {item.coloredTags.slice(0, 3).map((tag) => (
+                      <span 
+                        key={tag.name}
+                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded-full"
+                        style={{ backgroundColor: `${tag.color}20`, color: tag.color }}
+                      >
+                        <Tag className="h-2.5 w-2.5" />
+                        {tag.name}
+                      </span>
+                    ))}
+                    {item.coloredTags.length > 3 && (
+                      <span className="text-[10px] text-muted-foreground">+{item.coloredTags.length - 3}</span>
+                    )}
+                  </>
+                )}
+              </div>
               {/* Subtasks indicator */}
               {hasSubtasks && !isExpanded && (
                 <p className="text-xs text-muted-foreground mt-1">
