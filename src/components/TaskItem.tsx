@@ -21,6 +21,9 @@ interface TaskItemProps {
   isSelected?: boolean;
   isSelectionMode?: boolean;
   onSelect?: (itemId: string) => void;
+  expandedTasks?: Set<string>;
+  onToggleSubtasks?: (taskId: string) => void;
+  onUpdateSubtask?: (parentId: string, subtaskId: string, updates: Partial<TodoItem>) => void;
 }
 
 const getPriorityBorderColor = (priority?: Priority) => {
@@ -41,9 +44,21 @@ export const TaskItem = ({
   onImageClick,
   isSelected = false,
   isSelectionMode = false,
-  onSelect
+  onSelect,
+  expandedTasks,
+  onToggleSubtasks,
+  onUpdateSubtask
 }: TaskItemProps) => {
-  const [isOpen, setIsOpen] = useState(true);
+  // Default to collapsed (false) for subtasks
+  const [localIsOpen, setLocalIsOpen] = useState(false);
+  const isOpen = expandedTasks ? expandedTasks.has(item.id) : localIsOpen;
+  const setIsOpen = (open: boolean) => {
+    if (onToggleSubtasks) {
+      onToggleSubtasks(item.id);
+    } else {
+      setLocalIsOpen(open);
+    }
+  };
   const [swipeX, setSwipeX] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
@@ -156,14 +171,22 @@ export const TaskItem = ({
                   className="h-5 w-5 flex-shrink-0"
                 />
               )}
+              
+              {/* Expand/Collapse button for subtasks */}
+              {hasSubtasks && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
+                  className="p-1 rounded hover:bg-muted transition-colors flex-shrink-0"
+                >
+                  {isOpen ? (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </button>
+              )}
+              
               <div className="relative flex items-center flex-shrink-0">
-                {hasSubtasks && (
-                  <CollapsibleTrigger asChild onClick={(e) => e.stopPropagation()}>
-                    <button className="absolute -top-4 left-1/2 -translate-x-1/2 h-3 w-6 p-0 flex items-center justify-center hover:bg-transparent focus:bg-transparent focus:outline-none">
-                      {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                    </button>
-                  </CollapsibleTrigger>
-                )}
                 <Checkbox
                   checked={item.completed}
                   onCheckedChange={async (checked) => {
@@ -240,7 +263,7 @@ export const TaskItem = ({
                     )}
                   </div>
                 )}
-                {hasSubtasks && <p className="text-xs text-muted-foreground mt-1">{item.subtasks!.filter(st => st.completed).length}/{item.subtasks!.length} subtasks</p>}
+                {hasSubtasks && !isOpen && <p className="text-xs text-muted-foreground mt-1">{item.subtasks!.filter(st => st.completed).length}/{item.subtasks!.length} subtasks</p>}
               </div>
               {item.imageUrl && (
                 <div
@@ -254,23 +277,43 @@ export const TaskItem = ({
           </div>
         </div>
 
-        {hasSubtasks && (
-          <CollapsibleContent className="space-y-2">
+        {hasSubtasks && isOpen && (
+          <div className="ml-8 border-l-2 border-muted/50 bg-muted/10 rounded-b-lg overflow-hidden">
             {item.subtasks!.map((subtask) => (
-              <TaskItem
+              <div
                 key={subtask.id}
-                item={subtask}
-                level={level + 1}
-                onUpdate={onUpdate}
-                onDelete={onDelete}
-                onTaskClick={onTaskClick}
-                onImageClick={onImageClick}
-                isSelected={isSelected}
-                isSelectionMode={isSelectionMode}
-                onSelect={onSelect}
-              />
+                className="flex items-start gap-3 py-2 px-3 border-b border-border/30 last:border-b-0"
+              >
+                <Checkbox
+                  checked={subtask.completed}
+                  onCheckedChange={async (checked) => {
+                    if (onUpdateSubtask) {
+                      onUpdateSubtask(item.id, subtask.id, { completed: !!checked });
+                    }
+                    if (checked && !subtask.completed) {
+                      try { await Haptics.impact({ style: ImpactStyle.Light }); } catch {}
+                    }
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className={cn(
+                    "h-4 w-4 rounded-sm mt-0.5 flex-shrink-0",
+                    subtask.completed 
+                      ? "bg-muted-foreground/30 border-0 data-[state=checked]:bg-muted-foreground/30 data-[state=checked]:text-white" 
+                      : "border-2 border-muted-foreground/40"
+                  )}
+                />
+                <span className={cn(
+                  "text-sm flex-1",
+                  subtask.completed && "text-muted-foreground"
+                )}>
+                  {subtask.text}
+                </span>
+              </div>
             ))}
-          </CollapsibleContent>
+            <p className="text-xs text-muted-foreground px-3 py-1.5 bg-muted/20">
+              {item.subtasks!.filter(st => st.completed).length}/{item.subtasks!.length} completed
+            </p>
+          </div>
         )}
       </Collapsible>
     </div>

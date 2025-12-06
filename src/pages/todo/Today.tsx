@@ -415,127 +415,210 @@ const Today = () => {
     setSwipeState(null);
   };
 
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+
+  const toggleSubtasks = (taskId: string) => {
+    setExpandedTasks(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(taskId)) {
+        newSet.delete(taskId);
+      } else {
+        newSet.add(taskId);
+      }
+      return newSet;
+    });
+  };
+
+  const updateSubtask = async (parentId: string, subtaskId: string, updates: Partial<TodoItem>) => {
+    setItems(items.map(item => {
+      if (item.id === parentId && item.subtasks) {
+        return {
+          ...item,
+          subtasks: item.subtasks.map(st => st.id === subtaskId ? { ...st, ...updates } : st)
+        };
+      }
+      return item;
+    }));
+  };
+
   const renderTaskItem = (item: TodoItem) => {
     const hasSubtasks = item.subtasks && item.subtasks.length > 0;
     const currentSwipe = swipeState?.id === item.id ? swipeState : null;
+    const isExpanded = expandedTasks.has(item.id);
+    const completedSubtasks = item.subtasks?.filter(st => st.completed).length || 0;
+    const totalSubtasks = item.subtasks?.length || 0;
     
     return viewMode === 'flat' ? (
-      <div key={item.id} className="relative overflow-hidden">
-        {/* Swipe action backgrounds */}
-        <div className="absolute inset-0 flex">
-          <div className={cn(
-            "flex-1 flex items-center justify-start pl-4 transition-colors",
-            currentSwipe && currentSwipe.x > SWIPE_THRESHOLD ? "bg-green-500" : "bg-green-500/70"
-          )}>
-            <Check className="h-5 w-5 text-white" />
+      <div key={item.id} className="relative">
+        <div className="relative overflow-hidden">
+          {/* Swipe action backgrounds */}
+          <div className="absolute inset-0 flex">
+            <div className={cn(
+              "flex-1 flex items-center justify-start pl-4 transition-colors",
+              currentSwipe && currentSwipe.x > SWIPE_THRESHOLD ? "bg-green-500" : "bg-green-500/70"
+            )}>
+              <Check className="h-5 w-5 text-white" />
+            </div>
+            <div className={cn(
+              "flex-1 flex items-center justify-end pr-4 transition-colors",
+              currentSwipe && currentSwipe.x < -SWIPE_THRESHOLD ? "bg-red-500" : "bg-red-500/70"
+            )}>
+              <TrashIcon className="h-5 w-5 text-white" />
+            </div>
           </div>
-          <div className={cn(
-            "flex-1 flex items-center justify-end pr-4 transition-colors",
-            currentSwipe && currentSwipe.x < -SWIPE_THRESHOLD ? "bg-red-500" : "bg-red-500/70"
-          )}>
-            <TrashIcon className="h-5 w-5 text-white" />
+          
+          {/* Main flat item */}
+          <div 
+            className="flex items-start gap-3 py-2.5 px-2 border-b border-border/50 bg-background"
+            style={{ 
+              transform: `translateX(${currentSwipe?.x || 0}px)`, 
+              transition: currentSwipe?.isSwiping ? 'none' : 'transform 0.3s ease-out' 
+            }}
+            onTouchStart={(e) => handleFlatTouchStart(item.id, e)}
+            onTouchMove={(e) => handleFlatTouchMove(item.id, e)}
+            onTouchEnd={() => handleFlatTouchEnd(item)}
+          >
+            {isSelectionMode && (
+              <Checkbox checked={selectedTaskIds.has(item.id)} onCheckedChange={() => handleSelectTask(item.id)} className="h-5 w-5 mt-0.5" />
+            )}
+            
+            {/* Expand/Collapse button for subtasks */}
+            {hasSubtasks ? (
+              <button
+                onClick={(e) => { e.stopPropagation(); toggleSubtasks(item.id); }}
+                className="mt-0.5 p-0.5 rounded hover:bg-muted transition-colors flex-shrink-0"
+              >
+                {isExpanded ? (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                )}
+              </button>
+            ) : null}
+            
+            <Checkbox
+              checked={item.completed}
+              onCheckedChange={async (checked) => {
+                updateItem(item.id, { completed: !!checked });
+                if (checked && !item.completed) {
+                  try { await Haptics.impact({ style: ImpactStyle.Heavy }); } catch {}
+                }
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className={cn(
+                "h-5 w-5 rounded-sm border-0 mt-0.5 flex-shrink-0",
+                item.completed 
+                  ? "bg-muted-foreground/30 data-[state=checked]:bg-muted-foreground/30 data-[state=checked]:text-white" 
+                  : cn("border-2", getPriorityBorderColor(item.priority))
+              )}
+            />
+            <div className="flex-1 min-w-0" onClick={() => !currentSwipe?.isSwiping && setSelectedTask(item)}>
+              {/* Show voice player OR text based on whether it's a voice task */}
+              {item.voiceRecording ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={(e) => handleFlatVoicePlay(item, e)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
+                  >
+                    {playingVoiceId === item.id ? (
+                      <Pause className="h-4 w-4 text-primary flex-shrink-0" />
+                    ) : (
+                      <Play className="h-4 w-4 text-primary flex-shrink-0" />
+                    )}
+                    <WaveformVisualizer 
+                      isActive={playingVoiceId === item.id} 
+                      barCount={16}
+                      color="hsl(var(--primary))"
+                      className="h-5 w-20"
+                    />
+                    <span className="text-xs text-primary font-medium">
+                      {formatDuration(item.voiceRecording.duration)}
+                    </span>
+                  </button>
+                  {item.repeatType && item.repeatType !== 'none' && <Repeat className="h-3 w-3 text-purple-500 flex-shrink-0" />}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className={cn("text-sm", item.completed && "text-muted-foreground")}>{item.text}</span>
+                  {item.repeatType && item.repeatType !== 'none' && <Repeat className="h-3 w-3 text-purple-500 flex-shrink-0" />}
+                </div>
+              )}
+              {/* Tags display */}
+              {item.coloredTags && item.coloredTags.length > 0 && (
+                <div className="flex items-center gap-1 mt-1 flex-wrap">
+                  {item.coloredTags.slice(0, 4).map((tag) => (
+                    <span 
+                      key={tag.name}
+                      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded-full"
+                      style={{ backgroundColor: `${tag.color}20`, color: tag.color }}
+                    >
+                      <Tag className="h-2.5 w-2.5" />
+                      {tag.name}
+                    </span>
+                  ))}
+                  {item.coloredTags.length > 4 && (
+                    <span className="text-[10px] text-muted-foreground">+{item.coloredTags.length - 4}</span>
+                  )}
+                </div>
+              )}
+              {/* Subtasks indicator */}
+              {hasSubtasks && !isExpanded && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {completedSubtasks}/{totalSubtasks} subtasks
+                </p>
+              )}
+            </div>
+            {/* Image display */}
+            {item.imageUrl && (
+              <div
+                className="w-10 h-10 rounded-full overflow-hidden border-2 border-border flex-shrink-0 cursor-pointer hover:border-primary transition-colors"
+                onClick={(e) => { e.stopPropagation(); setSelectedImage(item.imageUrl!); }}
+              >
+                <img src={item.imageUrl} alt="Task attachment" className="w-full h-full object-cover" />
+              </div>
+            )}
           </div>
         </div>
         
-        {/* Main flat item */}
-        <div 
-          className="flex items-start gap-3 py-2.5 px-2 border-b border-border/50 bg-background"
-          style={{ 
-            transform: `translateX(${currentSwipe?.x || 0}px)`, 
-            transition: currentSwipe?.isSwiping ? 'none' : 'transform 0.3s ease-out' 
-          }}
-          onTouchStart={(e) => handleFlatTouchStart(item.id, e)}
-          onTouchMove={(e) => handleFlatTouchMove(item.id, e)}
-          onTouchEnd={() => handleFlatTouchEnd(item)}
-        >
-          {isSelectionMode && (
-            <Checkbox checked={selectedTaskIds.has(item.id)} onCheckedChange={() => handleSelectTask(item.id)} className="h-5 w-5 mt-0.5" />
-          )}
-          <Checkbox
-            checked={item.completed}
-            onCheckedChange={async (checked) => {
-              updateItem(item.id, { completed: !!checked });
-              if (checked && !item.completed) {
-                try { await Haptics.impact({ style: ImpactStyle.Heavy }); } catch {}
-              }
-            }}
-            onClick={(e) => e.stopPropagation()}
-            className={cn(
-              "h-5 w-5 rounded-sm border-0 mt-0.5 flex-shrink-0",
-              item.completed 
-                ? "bg-muted-foreground/30 data-[state=checked]:bg-muted-foreground/30 data-[state=checked]:text-white" 
-                : cn("border-2", getPriorityBorderColor(item.priority))
-            )}
-          />
-          <div className="flex-1 min-w-0" onClick={() => !currentSwipe?.isSwiping && setSelectedTask(item)}>
-            {/* Show voice player OR text based on whether it's a voice task */}
-            {item.voiceRecording ? (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={(e) => handleFlatVoicePlay(item, e)}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
-                >
-                  {playingVoiceId === item.id ? (
-                    <Pause className="h-4 w-4 text-primary flex-shrink-0" />
-                  ) : (
-                    <Play className="h-4 w-4 text-primary flex-shrink-0" />
+        {/* Collapsible Subtasks */}
+        {hasSubtasks && isExpanded && (
+          <div className="ml-8 border-l-2 border-muted/50 bg-muted/10">
+            {item.subtasks!.map((subtask) => (
+              <div
+                key={subtask.id}
+                className="flex items-start gap-3 py-2 px-3 border-b border-border/30"
+              >
+                <Checkbox
+                  checked={subtask.completed}
+                  onCheckedChange={async (checked) => {
+                    updateSubtask(item.id, subtask.id, { completed: !!checked });
+                    if (checked && !subtask.completed) {
+                      try { await Haptics.impact({ style: ImpactStyle.Light }); } catch {}
+                    }
+                  }}
+                  className={cn(
+                    "h-4 w-4 rounded-sm mt-0.5 flex-shrink-0",
+                    subtask.completed 
+                      ? "bg-muted-foreground/30 border-0 data-[state=checked]:bg-muted-foreground/30 data-[state=checked]:text-white" 
+                      : "border-2 border-muted-foreground/40"
                   )}
-                  <WaveformVisualizer 
-                    isActive={playingVoiceId === item.id} 
-                    barCount={16}
-                    color="hsl(var(--primary))"
-                    className="h-5 w-20"
-                  />
-                  <span className="text-xs text-primary font-medium">
-                    {formatDuration(item.voiceRecording.duration)}
-                  </span>
-                </button>
-                {item.repeatType && item.repeatType !== 'none' && <Repeat className="h-3 w-3 text-purple-500 flex-shrink-0" />}
+                />
+                <span className={cn(
+                  "text-sm flex-1",
+                  subtask.completed && "text-muted-foreground"
+                )}>
+                  {subtask.text}
+                </span>
               </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span className={cn("text-sm", item.completed && "text-muted-foreground")}>{item.text}</span>
-                {item.repeatType && item.repeatType !== 'none' && <Repeat className="h-3 w-3 text-purple-500 flex-shrink-0" />}
-              </div>
-            )}
-            {/* Tags display */}
-            {item.coloredTags && item.coloredTags.length > 0 && (
-              <div className="flex items-center gap-1 mt-1 flex-wrap">
-                {item.coloredTags.slice(0, 4).map((tag) => (
-                  <span 
-                    key={tag.name}
-                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded-full"
-                    style={{ backgroundColor: `${tag.color}20`, color: tag.color }}
-                  >
-                    <Tag className="h-2.5 w-2.5" />
-                    {tag.name}
-                  </span>
-                ))}
-                {item.coloredTags.length > 4 && (
-                  <span className="text-[10px] text-muted-foreground">+{item.coloredTags.length - 4}</span>
-                )}
-              </div>
-            )}
-            {/* Subtasks indicator */}
-            {hasSubtasks && (
-              <p className="text-xs text-muted-foreground mt-1">
-                {item.subtasks!.filter(st => st.completed).length}/{item.subtasks!.length} subtasks
-              </p>
-            )}
+            ))}
+            <p className="text-xs text-muted-foreground px-3 py-1.5 bg-muted/20">
+              {completedSubtasks}/{totalSubtasks} completed
+            </p>
           </div>
-          {/* Image display */}
-          {item.imageUrl && (
-            <div
-              className="w-10 h-10 rounded-full overflow-hidden border-2 border-border flex-shrink-0 cursor-pointer hover:border-primary transition-colors"
-              onClick={(e) => { e.stopPropagation(); setSelectedImage(item.imageUrl!); }}
-            >
-              <img src={item.imageUrl} alt="Task attachment" className="w-full h-full object-cover" />
-            </div>
-          )}
-        </div>
+        )}
       </div>
     ) : (
-      <TaskItem key={item.id} item={item} onUpdate={updateItem} onDelete={deleteItem} onTaskClick={setSelectedTask} onImageClick={setSelectedImage} isSelected={selectedTaskIds.has(item.id)} isSelectionMode={isSelectionMode} onSelect={handleSelectTask} />
+      <TaskItem key={item.id} item={item} onUpdate={updateItem} onDelete={deleteItem} onTaskClick={setSelectedTask} onImageClick={setSelectedImage} isSelected={selectedTaskIds.has(item.id)} isSelectionMode={isSelectionMode} onSelect={handleSelectTask} expandedTasks={expandedTasks} onToggleSubtasks={toggleSubtasks} onUpdateSubtask={updateSubtask} />
     );
   };
 
