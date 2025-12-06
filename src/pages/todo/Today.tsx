@@ -1,5 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { TodoItem, Folder, Priority, Note } from '@/types/note';
+import { WaveformVisualizer } from '@/components/WaveformVisualizer';
+import { Play, Pause } from 'lucide-react';
 import { Plus, FolderIcon, ChevronRight, ChevronDown, MoreVertical, Eye, EyeOff, Filter, Copy, MousePointer2, FolderPlus, Settings, LayoutList, LayoutGrid, Trash2, ListPlus, Tag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -334,6 +336,43 @@ const Today = () => {
     }
   };
 
+  // Voice playback state for flat view
+  const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+  const flatAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleFlatVoicePlay = (item: TodoItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!item.voiceRecording) return;
+
+    if (playingVoiceId === item.id && flatAudioRef.current) {
+      flatAudioRef.current.pause();
+      flatAudioRef.current = null;
+      setPlayingVoiceId(null);
+      return;
+    }
+
+    // Stop any currently playing audio
+    if (flatAudioRef.current) {
+      flatAudioRef.current.pause();
+      flatAudioRef.current = null;
+    }
+
+    const audio = new Audio(item.voiceRecording.audioUrl);
+    flatAudioRef.current = audio;
+    audio.onended = () => {
+      setPlayingVoiceId(null);
+      flatAudioRef.current = null;
+    };
+    audio.play();
+    setPlayingVoiceId(item.id);
+  };
+
   const renderTaskItem = (item: TodoItem) => (
     viewMode === 'flat' ? (
       <div key={item.id} className="flex items-start gap-3 py-2 px-1 border-b border-border/50">
@@ -356,10 +395,33 @@ const Today = () => {
           )}
         />
         <div className="flex-1 min-w-0" onClick={() => setSelectedTask(item)}>
-          <span className={cn("text-sm block", item.completed && "text-muted-foreground")}>
-            {item.text}
-          </span>
-          {item.coloredTags && item.coloredTags.length > 0 && (
+          {/* Show voice player OR text based on whether it's a voice task */}
+          {item.voiceRecording ? (
+            <button
+              onClick={(e) => handleFlatVoicePlay(item, e)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
+            >
+              {playingVoiceId === item.id ? (
+                <Pause className="h-4 w-4 text-primary flex-shrink-0" />
+              ) : (
+                <Play className="h-4 w-4 text-primary flex-shrink-0" />
+              )}
+              <WaveformVisualizer 
+                isActive={playingVoiceId === item.id} 
+                barCount={16}
+                color="hsl(var(--primary))"
+                className="h-5 w-20"
+              />
+              <span className="text-xs text-primary font-medium">
+                {formatDuration(item.voiceRecording.duration)}
+              </span>
+            </button>
+          ) : (
+            <span className={cn("text-sm block", item.completed && "text-muted-foreground")}>
+              {item.text}
+            </span>
+          )}
+          {item.coloredTags && item.coloredTags.length > 0 && !item.voiceRecording && (
             <div className="flex items-center gap-1 mt-1 flex-wrap">
               {item.coloredTags.slice(0, 4).map((tag) => (
                 <span 
