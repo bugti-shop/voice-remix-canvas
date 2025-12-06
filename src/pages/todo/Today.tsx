@@ -46,6 +46,7 @@ const Today = () => {
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('flat');
 
   useEffect(() => {
@@ -75,6 +76,8 @@ const Today = () => {
     if (savedPriorityFilter) setPriorityFilter(savedPriorityFilter as PriorityFilter);
     const savedStatusFilter = localStorage.getItem('todoStatusFilter');
     if (savedStatusFilter) setStatusFilter(savedStatusFilter as StatusFilter);
+    const savedTagFilter = localStorage.getItem('todoTagFilter');
+    if (savedTagFilter) setTagFilter(JSON.parse(savedTagFilter));
     const savedViewMode = localStorage.getItem('todoViewMode');
     if (savedViewMode) setViewMode(savedViewMode as ViewMode);
   }, []);
@@ -86,7 +89,8 @@ const Today = () => {
     localStorage.setItem('todoDateFilter', dateFilter); 
     localStorage.setItem('todoPriorityFilter', priorityFilter);
     localStorage.setItem('todoStatusFilter', statusFilter);
-  }, [dateFilter, priorityFilter, statusFilter]);
+    localStorage.setItem('todoTagFilter', JSON.stringify(tagFilter));
+  }, [dateFilter, priorityFilter, statusFilter, tagFilter]);
   useEffect(() => { localStorage.setItem('todoViewMode', viewMode); }, [viewMode]);
 
   const handleCreateFolder = (name: string, color: string) => {
@@ -289,8 +293,15 @@ const Today = () => {
             break;
         }
       }
+
+      // Tag filter
+      let tagMatch = true;
+      if (tagFilter.length > 0) {
+        const itemTags = item.coloredTags?.map(t => t.name) || [];
+        tagMatch = tagFilter.some(tag => itemTags.includes(tag));
+      }
       
-      return folderMatch && priorityMatch && statusMatch && dateMatch;
+      return folderMatch && priorityMatch && statusMatch && dateMatch && tagMatch;
     });
 
     // Sort by date (tasks with dates first, then by date)
@@ -301,7 +312,7 @@ const Today = () => {
     });
 
     return filtered;
-  }, [items, selectedFolderId, priorityFilter, statusFilter, dateFilter]);
+  }, [items, selectedFolderId, priorityFilter, statusFilter, dateFilter, tagFilter]);
 
   const uncompletedItems = processedItems.filter(item => !item.completed);
   const completedItems = processedItems.filter(item => item.completed);
@@ -311,6 +322,7 @@ const Today = () => {
     setDateFilter('all');
     setPriorityFilter('all');
     setStatusFilter('all');
+    setTagFilter([]);
   };
 
   const getPriorityBorderColor = (priority?: Priority) => {
@@ -485,7 +497,7 @@ const Today = () => {
 
       <TaskInputSheet isOpen={isInputOpen} onClose={() => setIsInputOpen(false)} onAddTask={handleAddTask} folders={folders} selectedFolderId={selectedFolderId} onCreateFolder={handleCreateFolder} />
       <TaskDetailSheet isOpen={!!selectedTask} task={selectedTask} onClose={() => setSelectedTask(null)} onUpdate={(updatedTask) => { updateItem(updatedTask.id, updatedTask); setSelectedTask(updatedTask); }} onDelete={deleteItem} onDuplicate={duplicateTask} />
-      <TaskFilterSheet isOpen={isFilterSheetOpen} onClose={() => setIsFilterSheetOpen(false)} folders={folders} selectedFolderId={selectedFolderId} onFolderChange={setSelectedFolderId} dateFilter={dateFilter} onDateFilterChange={setDateFilter} priorityFilter={priorityFilter} onPriorityFilterChange={setPriorityFilter} statusFilter={statusFilter} onStatusFilterChange={setStatusFilter} onClearAll={handleClearFilters} />
+      <TaskFilterSheet isOpen={isFilterSheetOpen} onClose={() => setIsFilterSheetOpen(false)} folders={folders} selectedFolderId={selectedFolderId} onFolderChange={setSelectedFolderId} dateFilter={dateFilter} onDateFilterChange={setDateFilter} priorityFilter={priorityFilter} onPriorityFilterChange={setPriorityFilter} statusFilter={statusFilter} onStatusFilterChange={setStatusFilter} selectedTags={tagFilter} onTagsChange={setTagFilter} onClearAll={handleClearFilters} />
       <DuplicateOptionsSheet isOpen={isDuplicateSheetOpen} onClose={() => setIsDuplicateSheetOpen(false)} onSelect={handleDuplicate} />
       <FolderManageSheet isOpen={isFolderManageOpen} onClose={() => setIsFolderManageOpen(false)} folders={folders} onCreateFolder={handleCreateFolder} onEditFolder={handleEditFolder} onDeleteFolder={handleDeleteFolder} />
       <MoveToFolderSheet isOpen={isMoveToFolderOpen} onClose={() => setIsMoveToFolderOpen(false)} folders={folders} onSelect={handleMoveToFolder} />

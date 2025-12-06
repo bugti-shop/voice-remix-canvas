@@ -1,10 +1,12 @@
+import { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
-import { Folder, Priority } from '@/types/note';
-import { X } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Folder, Priority, ColoredTag } from '@/types/note';
+import { X, Tag } from 'lucide-react';
 
 export type DateFilter = 'all' | 'today' | 'tomorrow' | 'this-week' | 'overdue' | 'no-date' | 'has-date';
 export type PriorityFilter = 'all' | Priority;
@@ -22,6 +24,8 @@ interface TaskFilterSheetProps {
   onPriorityFilterChange: (value: PriorityFilter) => void;
   statusFilter: StatusFilter;
   onStatusFilterChange: (value: StatusFilter) => void;
+  selectedTags: string[];
+  onTagsChange: (tags: string[]) => void;
   onClearAll: () => void;
 }
 
@@ -37,9 +41,28 @@ export const TaskFilterSheet = ({
   onPriorityFilterChange,
   statusFilter,
   onStatusFilterChange,
+  selectedTags,
+  onTagsChange,
   onClearAll,
 }: TaskFilterSheetProps) => {
-  const hasActiveFilters = selectedFolderId !== null || dateFilter !== 'all' || priorityFilter !== 'all' || statusFilter !== 'all';
+  const [savedTags, setSavedTags] = useState<ColoredTag[]>([]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('savedColoredTags');
+    if (saved) {
+      setSavedTags(JSON.parse(saved));
+    }
+  }, [isOpen]);
+
+  const hasActiveFilters = selectedFolderId !== null || dateFilter !== 'all' || priorityFilter !== 'all' || statusFilter !== 'all' || selectedTags.length > 0;
+
+  const handleTagToggle = (tagName: string) => {
+    if (selectedTags.includes(tagName)) {
+      onTagsChange(selectedTags.filter(t => t !== tagName));
+    } else {
+      onTagsChange([...selectedTags, tagName]);
+    }
+  };
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -57,6 +80,36 @@ export const TaskFilterSheet = ({
         </SheetHeader>
 
         <div className="space-y-6 overflow-y-auto pb-8">
+          {/* Filter by Tags */}
+          {savedTags.length > 0 && (
+            <>
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Tags</h3>
+                <div className="flex flex-wrap gap-2">
+                  {savedTags.map((tag) => (
+                    <button
+                      key={tag.name}
+                      onClick={() => handleTagToggle(tag.name)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-full transition-all ${
+                        selectedTags.includes(tag.name) 
+                          ? 'ring-2 ring-offset-2 ring-primary' 
+                          : 'hover:opacity-80'
+                      }`}
+                      style={{ 
+                        backgroundColor: `${tag.color}20`, 
+                        color: tag.color 
+                      }}
+                    >
+                      <Tag className="h-3.5 w-3.5" />
+                      {tag.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <Separator />
+            </>
+          )}
+
           {/* Filter by Folder */}
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Folder</h3>

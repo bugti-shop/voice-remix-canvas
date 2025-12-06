@@ -61,6 +61,7 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
   const [tagInput, setTagInput] = useState('');
   const [selectedTagColor, setSelectedTagColor] = useState('#14b8a6');
   const [showTagInput, setShowTagInput] = useState(false);
+  const [showManageTags, setShowManageTags] = useState(false);
   const [deadline, setDeadline] = useState<Date | undefined>();
   const [showDeadlinePicker, setShowDeadlinePicker] = useState(false);
   const [showEditActions, setShowEditActions] = useState(false);
@@ -246,6 +247,12 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
 
   const handleRemoveTag = (tagName: string) => {
     setColoredTags(coloredTags.filter(t => t.name !== tagName));
+  };
+
+  const handleDeleteSavedTag = (tagName: string) => {
+    const updatedSaved = savedTags.filter(t => t.name !== tagName);
+    setSavedTags(updatedSaved);
+    localStorage.setItem('savedColoredTags', JSON.stringify(updatedSaved));
   };
 
   if (!isOpen) return null;
@@ -479,7 +486,15 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
                   {/* Saved tag suggestions */}
                   {savedTags.length > 0 && (
                     <div>
-                      <p className="text-xs text-muted-foreground mb-2">Recent tags</p>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs text-muted-foreground">Recent tags</p>
+                        <button
+                          onClick={() => setShowManageTags(true)}
+                          className="text-xs text-primary hover:underline"
+                        >
+                          Manage
+                        </button>
+                      </div>
                       <div className="flex flex-wrap gap-1.5">
                         {savedTags
                           .filter(st => !coloredTags.some(ct => ct.name === st.name))
@@ -760,6 +775,43 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
         actions={actionItems}
         onSave={handleSaveActions}
       />
+
+      {/* Manage Tags Dialog */}
+      <Dialog open={showManageTags} onOpenChange={setShowManageTags}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Manage Saved Tags</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+            {savedTags.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No saved tags yet</p>
+            ) : (
+              savedTags.map((tag) => (
+                <div 
+                  key={tag.name} 
+                  className="flex items-center justify-between p-3 rounded-lg border border-border"
+                >
+                  <div className="flex items-center gap-2">
+                    <span 
+                      className="w-4 h-4 rounded-full flex-shrink-0" 
+                      style={{ backgroundColor: tag.color }} 
+                    />
+                    <span className="text-sm font-medium">{tag.name}</span>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => handleDeleteSavedTag(tag.name)}
+                    className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
