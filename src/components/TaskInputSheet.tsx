@@ -604,17 +604,17 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
                     <PopoverTrigger asChild>
                       <button
                         className={cn(
-                          "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
+                          "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all whitespace-nowrap",
                           dueDate ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30" : "border-border bg-card hover:bg-muted"
                         )}
                       >
                         {dueDate && <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full" />}
                         {dueDate ? (
-                          <CalendarCheck className="h-4 w-4 text-blue-500" />
+                          <CalendarCheck className="h-4 w-4 text-blue-500 flex-shrink-0" />
                         ) : (
-                          <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                          <CalendarIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                         )}
-                        <span className={cn("text-sm", dueDate ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground")}>
+                        <span className={cn("text-sm whitespace-nowrap", dueDate ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground")}>
                           {dueDate ? format(dueDate, 'MMM d') : 'Date'}
                         </span>
                       </button>
@@ -647,7 +647,7 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
                   <Popover key={action.id} open={showPriorityMenu} onOpenChange={setShowPriorityMenu}>
                     <PopoverTrigger asChild>
                       <button className={cn(
-                        "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
+                        "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all whitespace-nowrap",
                         priority === 'high' ? "border-red-500 bg-red-50 dark:bg-red-950/30" :
                         priority === 'medium' ? "border-orange-500 bg-orange-50 dark:bg-orange-950/30" :
                         priority === 'low' ? "border-green-500 bg-green-50 dark:bg-green-950/30" :
@@ -661,13 +661,13 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
                             'bg-green-500'
                           )} />
                         )}
-                        <Flag className={cn("h-4 w-4", 
+                        <Flag className={cn("h-4 w-4 flex-shrink-0", 
                           priority === 'high' ? 'text-red-500 fill-red-500' : 
                           priority === 'medium' ? 'text-orange-500 fill-orange-500' : 
                           priority === 'low' ? 'text-green-500 fill-green-500' : 
                           'text-muted-foreground'
                         )} />
-                        <span className={cn("text-sm",
+                        <span className={cn("text-sm whitespace-nowrap",
                           priority === 'high' ? 'text-red-600 dark:text-red-400' : 
                           priority === 'medium' ? 'text-orange-600 dark:text-orange-400' : 
                           priority === 'low' ? 'text-green-600 dark:text-green-400' : 
@@ -702,18 +702,18 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
                   <button
                     key={action.id}
                     className={cn(
-                      "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
+                      "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all whitespace-nowrap",
                       reminderTime ? "border-purple-500 bg-purple-50 dark:bg-purple-950/30" : "border-border bg-card hover:bg-muted"
                     )}
                     onClick={() => setShowTimePicker(true)}
                   >
                     {reminderTime && <span className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full" />}
                     {reminderTime ? (
-                      <BellRing className="h-4 w-4 text-purple-500 fill-purple-500" />
+                      <BellRing className="h-4 w-4 text-purple-500 fill-purple-500 flex-shrink-0" />
                     ) : (
-                      <Timer className="h-4 w-4 text-muted-foreground" />
+                      <Timer className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     )}
-                    <span className={cn("text-sm", reminderTime ? "text-purple-600 dark:text-purple-400" : "text-muted-foreground")}>
+                    <span className={cn("text-sm whitespace-nowrap", reminderTime ? "text-purple-600 dark:text-purple-400" : "text-muted-foreground")}>
                       {reminderTime ? format(reminderTime, 'h:mm a') : 'Reminders'}
                     </span>
                   </button>
@@ -726,13 +726,13 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
                     <PopoverTrigger asChild>
                       <button
                         className={cn(
-                          "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
+                          "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all whitespace-nowrap",
                           coloredTags.length > 0 ? "border-teal-500 bg-teal-50 dark:bg-teal-950/30" : "border-border bg-card hover:bg-muted"
                         )}
                       >
                         {coloredTags.length > 0 && <span className="absolute -top-1 -right-1 w-2 h-2 bg-teal-500 rounded-full" />}
-                        <Tag className={cn("h-4 w-4", coloredTags.length > 0 ? "text-teal-500" : "text-muted-foreground")} />
-                        <span className={cn("text-sm", coloredTags.length > 0 ? "text-teal-600 dark:text-teal-400" : "text-muted-foreground")}>
+                        <Tag className={cn("h-4 w-4 flex-shrink-0", coloredTags.length > 0 ? "text-teal-500" : "text-muted-foreground")} />
+                        <span className={cn("text-sm whitespace-nowrap", coloredTags.length > 0 ? "text-teal-600 dark:text-teal-400" : "text-muted-foreground")}>
                           {coloredTags.length > 0 ? `${coloredTags.length} Tag${coloredTags.length > 1 ? 's' : ''}` : 'Tags'}
                         </span>
                       </button>
@@ -828,13 +828,13 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
                     <PopoverTrigger asChild>
                       <button
                         className={cn(
-                          "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
+                          "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all whitespace-nowrap",
                           deadline ? "border-rose-500 bg-rose-50 dark:bg-rose-950/30" : "border-border bg-card hover:bg-muted"
                         )}
                       >
                         {deadline && <span className="absolute -top-1 -right-1 w-2 h-2 bg-rose-500 rounded-full" />}
-                        <CalendarClock className={cn("h-4 w-4", deadline ? "text-rose-500" : "text-muted-foreground")} />
-                        <span className={cn("text-sm", deadline ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground")}>
+                        <CalendarClock className={cn("h-4 w-4 flex-shrink-0", deadline ? "text-rose-500" : "text-muted-foreground")} />
+                        <span className={cn("text-sm whitespace-nowrap", deadline ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground")}>
                           {deadline ? format(deadline, 'MMM d') : 'Deadline'}
                         </span>
                       </button>
@@ -865,14 +865,14 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
                   <button
                     key={action.id}
                     className={cn(
-                      "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
+                      "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all whitespace-nowrap",
                       folderId ? "border-amber-500 bg-amber-50 dark:bg-amber-950/30" : "border-border bg-card hover:bg-muted"
                     )}
                     onClick={() => setShowFolderDialog(true)}
                   >
                     {folderId && <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full" />}
-                    <FolderIcon className={cn("h-4 w-4", folderId ? "text-amber-500" : "text-muted-foreground")} />
-                    <span className={cn("text-sm", folderId ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground")}>
+                    <FolderIcon className={cn("h-4 w-4 flex-shrink-0", folderId ? "text-amber-500" : "text-muted-foreground")} />
+                    <span className={cn("text-sm whitespace-nowrap", folderId ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground")}>
                       {folderId ? folders.find(f => f.id === folderId)?.name || 'Folder' : 'Folder'}
                     </span>
                   </button>
@@ -884,14 +884,14 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
                   <button
                     key={action.id}
                     className={cn(
-                      "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
+                      "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all whitespace-nowrap",
                       imageUrl ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30" : "border-border bg-card hover:bg-muted"
                     )}
                     onClick={() => imageInputRef.current?.click()}
                   >
                     {imageUrl && <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full" />}
-                    <ImageIcon className={cn("h-4 w-4", imageUrl ? "text-emerald-500" : "text-muted-foreground")} />
-                    <span className={cn("text-sm", imageUrl ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")}>
+                    <ImageIcon className={cn("h-4 w-4 flex-shrink-0", imageUrl ? "text-emerald-500" : "text-muted-foreground")} />
+                    <span className={cn("text-sm whitespace-nowrap", imageUrl ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")}>
                       {imageUrl ? 'Image Added' : 'Image'}
                     </span>
                   </button>
@@ -904,13 +904,13 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
                     <PopoverTrigger asChild>
                       <button
                         className={cn(
-                          "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
+                          "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all whitespace-nowrap",
                           repeatType !== 'none' ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30" : "border-border bg-card hover:bg-muted"
                         )}
                       >
                         {repeatType !== 'none' && <span className="absolute -top-1 -right-1 w-2 h-2 bg-indigo-500 rounded-full" />}
-                        <Repeat className={cn("h-4 w-4", repeatType !== 'none' ? "text-indigo-500" : "text-muted-foreground")} />
-                        <span className={cn("text-sm", repeatType !== 'none' ? "text-indigo-600 dark:text-indigo-400" : "text-muted-foreground")}>
+                        <Repeat className={cn("h-4 w-4 flex-shrink-0", repeatType !== 'none' ? "text-indigo-500" : "text-muted-foreground")} />
+                        <span className={cn("text-sm whitespace-nowrap", repeatType !== 'none' ? "text-indigo-600 dark:text-indigo-400" : "text-muted-foreground")}>
                           {repeatType !== 'none' ? getRepeatLabel() : 'Repeat'}
                         </span>
                       </button>
@@ -949,11 +949,11 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
 
             {/* Edit Actions Button - always last */}
             <button
-              className="relative flex items-center gap-1.5 px-3 py-2 rounded-md border border-border bg-card hover:bg-muted transition-all"
+              className="relative flex items-center gap-1.5 px-3 py-2 rounded-md border border-border bg-card hover:bg-muted transition-all whitespace-nowrap"
               onClick={() => setShowEditActions(true)}
             >
-              <Settings2 className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Edit Actions</span>
+              <Settings2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <span className="text-sm text-muted-foreground whitespace-nowrap">Edit Actions</span>
             </button>
 
             <input
