@@ -20,7 +20,13 @@ import {
   Clock,
   Bell,
   CalendarCheck,
-  BellRing
+  BellRing,
+  Tag,
+  CalendarClock,
+  ListOrdered,
+  GripVertical,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -35,9 +41,11 @@ interface TaskInputSheetProps {
   folders: Folder[];
   selectedFolderId?: string | null;
   onCreateFolder: (name: string, color: string) => void;
+  existingTasks?: TodoItem[];
+  onReorderTasks?: (tasks: TodoItem[]) => void;
 }
 
-export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFolderId, onCreateFolder }: TaskInputSheetProps) => {
+export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFolderId, onCreateFolder, existingTasks = [], onReorderTasks }: TaskInputSheetProps) => {
   const [taskText, setTaskText] = useState('');
   const [priority, setPriority] = useState<Priority>('none');
   const [dueDate, setDueDate] = useState<Date | undefined>();
@@ -53,6 +61,13 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
   const [newFolderName, setNewFolderName] = useState('');
   const [selectedColor, setSelectedColor] = useState('#3b82f6');
   const [imageUrl, setImageUrl] = useState<string | undefined>();
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
+  const [showTagInput, setShowTagInput] = useState(false);
+  const [deadline, setDeadline] = useState<Date | undefined>();
+  const [showDeadlinePicker, setShowDeadlinePicker] = useState(false);
+  const [showReorderSheet, setShowReorderSheet] = useState(false);
+  const [reorderTasks, setReorderTasks] = useState<TodoItem[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -68,6 +83,10 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
       setRepeatDays([]);
       setFolderId(undefined);
       setImageUrl(undefined);
+      setTags([]);
+      setTagInput('');
+      setShowTagInput(false);
+      setDeadline(undefined);
     }
   }, [isOpen]);
 
@@ -87,12 +106,13 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
     const mainTask: Omit<TodoItem, 'id' | 'completed'> = {
       text: taskText,
       priority: priority !== 'none' ? priority : undefined,
-      dueDate,
+      dueDate: deadline || dueDate,
       reminderTime,
       repeatType: repeatType !== 'none' ? repeatType : undefined,
       repeatDays: repeatType === 'custom' && repeatDays.length > 0 ? repeatDays : undefined,
       folderId,
       imageUrl,
+      tags: tags.length > 0 ? tags : undefined,
     };
 
     onAddTask(mainTask);
@@ -186,6 +206,47 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
     }
   };
 
+  const handleAddTag = () => {
+    if (tagInput.trim() && !tags.includes(tagInput.trim())) {
+      setTags([...tags, tagInput.trim()]);
+      setTagInput('');
+    }
+  };
+
+  const handleRemoveTag = (tag: string) => {
+    setTags(tags.filter(t => t !== tag));
+  };
+
+  const handleOpenReorder = () => {
+    setReorderTasks([...existingTasks]);
+    setShowReorderSheet(true);
+  };
+
+  const handleMoveTaskUp = (index: number) => {
+    if (index === 0) return;
+    const newTasks = [...reorderTasks];
+    [newTasks[index - 1], newTasks[index]] = [newTasks[index], newTasks[index - 1]];
+    setReorderTasks(newTasks);
+  };
+
+  const handleMoveTaskDown = (index: number) => {
+    if (index === reorderTasks.length - 1) return;
+    const newTasks = [...reorderTasks];
+    [newTasks[index], newTasks[index + 1]] = [newTasks[index + 1], newTasks[index]];
+    setReorderTasks(newTasks);
+  };
+
+  const handleSaveReorder = async () => {
+    try {
+      await Haptics.impact({ style: ImpactStyle.Light });
+    } catch {}
+    if (onReorderTasks) {
+      onReorderTasks(reorderTasks);
+    }
+    setShowReorderSheet(false);
+    toast.success('Tasks reordered successfully');
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -252,7 +313,22 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
             </div>
           )}
 
-          <div className="flex items-center gap-2">
+          {/* Tags display */}
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {tags.map((tag) => (
+                <span key={tag} className="inline-flex items-center gap-1 px-2 py-1 bg-teal-50 dark:bg-teal-950/30 text-teal-600 dark:text-teal-400 text-xs rounded-full border border-teal-200 dark:border-teal-800">
+                  <Tag className="h-3 w-3" />
+                  {tag}
+                  <button onClick={() => handleRemoveTag(tag)}>
+                    <X className="h-3 w-3 hover:text-teal-800" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 flex-wrap">
             <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
               <PopoverTrigger asChild>
                 <button
@@ -361,6 +437,94 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
                 {reminderTime ? format(reminderTime, 'h:mm a') : 'Reminders'}
               </span>
             </button>
+
+            {/* Tag Button */}
+            <Popover open={showTagInput} onOpenChange={setShowTagInput}>
+              <PopoverTrigger asChild>
+                <button
+                  className={cn(
+                    "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
+                    tags.length > 0 ? "border-teal-500 bg-teal-50 dark:bg-teal-950/30" : "border-border bg-card hover:bg-muted"
+                  )}
+                >
+                  {tags.length > 0 && <span className="absolute -top-1 -right-1 w-2 h-2 bg-teal-500 rounded-full" />}
+                  <Tag className={cn("h-4 w-4", tags.length > 0 ? "text-teal-500" : "text-muted-foreground")} />
+                  <span className={cn("text-sm", tags.length > 0 ? "text-teal-600 dark:text-teal-400" : "text-muted-foreground")}>
+                    {tags.length > 0 ? `${tags.length} Tag${tags.length > 1 ? 's' : ''}` : 'Tags'}
+                  </span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-3 bg-popover z-50" align="start">
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Add a tag..."
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(); } }}
+                      className="h-9 text-sm"
+                    />
+                    <Button size="sm" onClick={handleAddTag} disabled={!tagInput.trim()}>Add</Button>
+                  </div>
+                  {tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {tags.map((tag) => (
+                        <span key={tag} className="inline-flex items-center gap-1 px-2 py-1 bg-teal-50 dark:bg-teal-950/30 text-teal-600 dark:text-teal-400 text-xs rounded-full">
+                          {tag}
+                          <button onClick={() => handleRemoveTag(tag)}><X className="h-3 w-3" /></button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Deadline Button */}
+            <Popover open={showDeadlinePicker} onOpenChange={setShowDeadlinePicker}>
+              <PopoverTrigger asChild>
+                <button
+                  className={cn(
+                    "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all",
+                    deadline ? "border-rose-500 bg-rose-50 dark:bg-rose-950/30" : "border-border bg-card hover:bg-muted"
+                  )}
+                >
+                  {deadline && <span className="absolute -top-1 -right-1 w-2 h-2 bg-rose-500 rounded-full" />}
+                  <CalendarClock className={cn("h-4 w-4", deadline ? "text-rose-500" : "text-muted-foreground")} />
+                  <span className={cn("text-sm", deadline ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground")}>
+                    {deadline ? format(deadline, 'MMM d') : 'Deadline'}
+                  </span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 bg-popover z-50" align="start">
+                <Calendar
+                  mode="single"
+                  selected={deadline}
+                  onSelect={(date) => {
+                    setDeadline(date);
+                    setShowDeadlinePicker(false);
+                  }}
+                />
+                {deadline && (
+                  <div className="p-2 border-t">
+                    <Button variant="ghost" size="sm" className="w-full text-rose-500" onClick={() => { setDeadline(undefined); setShowDeadlinePicker(false); }}>
+                      <X className="h-4 w-4 mr-2" />Remove Deadline
+                    </Button>
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
+
+            {/* Edit Tasks (Reorder) Button */}
+            {existingTasks.length > 0 && (
+              <button
+                className="relative flex items-center gap-1.5 px-3 py-2 rounded-md border border-border bg-card hover:bg-muted transition-all"
+                onClick={handleOpenReorder}
+              >
+                <ListOrdered className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Edit Tasks</span>
+              </button>
+            )}
 
             <Popover>
               <PopoverTrigger asChild>
@@ -527,6 +691,58 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
                 />
               </div>
               <p className="text-xs text-muted-foreground">You'll receive a notification at the selected time</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reorder Tasks Sheet */}
+      {showReorderSheet && (
+        <div className="fixed inset-0 bg-black/50 z-[70] flex items-end justify-center">
+          <div className="bg-background rounded-t-2xl w-full max-w-lg shadow-2xl animate-in slide-in-from-bottom duration-300">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <ListOrdered className="h-5 w-5 text-muted-foreground" />
+                Reorder Tasks
+              </h3>
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setShowReorderSheet(false)}>Cancel</Button>
+                <Button size="sm" onClick={handleSaveReorder}>Save</Button>
+              </div>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto p-4">
+              {reorderTasks.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">No tasks to reorder</p>
+              ) : (
+                <div className="space-y-2">
+                  {reorderTasks.filter(t => !t.completed).map((task, index) => (
+                    <div key={task.id} className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg border border-border">
+                      <GripVertical className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                      <span className="flex-1 text-sm truncate">{task.text}</span>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleMoveTaskUp(index)}
+                          disabled={index === 0}
+                        >
+                          <ChevronUp className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleMoveTaskDown(index)}
+                          disabled={index === reorderTasks.filter(t => !t.completed).length - 1}
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
