@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { BottomNavigation } from '@/components/BottomNavigation';
-import { Note } from '@/types/note';
-import { getAllUpcomingReminders } from '@/utils/noteNotifications';
-import { getNotificationHistory, clearNotificationHistory } from '@/types/notificationHistory';
-import { Bell, Calendar, Clock, Repeat, History, Trash2 } from 'lucide-react';
+import { Note, TodoItem } from '@/types/note';
+import { notificationManager } from '@/utils/notifications';
+import { Bell, Calendar, Clock, Repeat, History, Trash2, CheckCircle2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,33 +14,45 @@ import { toast } from 'sonner';
 
 interface ReminderItem {
   id: number;
-  noteId: string;
   title: string;
   body: string;
   schedule: Date;
   recurring?: string;
+  type: 'task' | 'note';
+  taskId?: string;
+  noteId?: string;
+  task?: TodoItem;
   note?: Note;
 }
 
 const Reminders = () => {
   const navigate = useNavigate();
   const [reminders, setReminders] = useState<ReminderItem[]>([]);
-  const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [historyItems, setHistoryItems] = useState<any[]>([]);
 
   useEffect(() => {
     loadReminders();
     loadHistory();
+
+    // Listen for notification updates
+    const handleNotificationReceived = () => {
+      loadHistory();
+    };
+
+    window.addEventListener('notificationReceived', handleNotificationReceived);
+    return () => {
+      window.removeEventListener('notificationReceived', handleNotificationReceived);
+    };
   }, []);
 
   const loadHistory = () => {
-    const history = getNotificationHistory();
+    const history = notificationManager.getNotificationHistory();
     setHistoryItems(history);
   };
 
   const handleClearHistory = () => {
-    clearNotificationHistory();
+    notificationManager.clearNotificationHistory();
     setHistoryItems([]);
     toast.success('History cleared');
   };
@@ -49,23 +60,99 @@ const Reminders = () => {
   const loadReminders = async () => {
     setLoading(true);
     try {
+      // Load notes
       const savedNotes = localStorage.getItem('notes');
       const allNotes: Note[] = savedNotes ? JSON.parse(savedNotes) : [];
-      setNotes(allNotes);
 
-      const upcomingReminders = await getAllUpcomingReminders();
+      // Load tasks
+      const savedTasks = localStorage.getItem('todoItems');
+      const allTasks: TodoItem[] = savedTasks ? JSON.parse(savedTasks) : [];
 
-      const remindersWithNotes = upcomingReminders.map(reminder => ({
-        ...reminder,
-        note: allNotes.find(note => note.id === reminder.noteId),
-      }));
+      // Get pending notifications from the system
+      const pendingNotifications = await notificationManager.getPendingNotifications();
 
-      setReminders(remindersWithNotes);
+      const reminderItems: ReminderItem[] = pendingNotifications.map(notification => {
+        const extra = notification.extra as any;
+        const task = extra?.taskId ? allTasks.find(t => t.id === extra.taskId) : undefined;
+        const note = extra?.noteId ? allNotes.find(n => n.id === extra.noteId) : undefined;
+
+        return {
+          id: notification.id,
+          title: notification.title || 'Reminder',
+          body: notification.body || '',
+          schedule: notification.schedule?.at ? new Date(notification.schedule.at) : new Date(),
+          recurring: extra?.recurringType,
+          type: extra?.type || 'task',
+          taskId: extra?.taskId,
+          noteId: extra?.noteId,
+          task,
+          note,
+        };
+      }).filter(r => r.schedule > new Date());
+
+      // Sort by schedule date
+      reminderItems.sort((a, b) => a.schedule.getTime() - b.schedule.getTime());
+
+      setReminders(reminderItems);
     } catch (error) {
       console.error('Error loading reminders:', error);
+      // Fallback to loading from localStorage data
+      loadRemindersFromStorage();
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadRemindersFromStorage = () => {
+    const savedNotes = localStorage.getItem('notes');
+    const allNotes: Note[] = savedNotes ? JSON.parse(savedNotes) : [];
+
+    const savedTasks = localStorage.getItem('todoItems');
+    const allTasks: TodoItem[] = savedTasks ? JSON.parse(savedTasks) : [];
+
+    const reminderItems: ReminderItem[] = [];
+
+    // Add note reminders
+    allNotes.forEach(note => {
+      if (note.reminderEnabled && note.reminderTime) {
+        const reminderDate = new Date(note.reminderTime);
+        if (reminderDate > new Date()) {
+          reminderItems.push({
+            id: parseInt(note.id.slice(0, 8), 16) || Date.now(),
+            title: note.title || 'Note Reminder',
+            body: note.content?.slice(0, 100) || '',
+            schedule: reminderDate,
+            recurring: note.reminderRecurring,
+            type: 'note',
+            noteId: note.id,
+            note,
+          });
+        }
+      }
+    });
+
+    // Add task reminders
+    allTasks.forEach(task => {
+      if ((task.reminderTime || task.dueDate) && !task.completed) {
+        const reminderDate = task.reminderTime ? new Date(task.reminderTime) : new Date(task.dueDate!);
+        if (reminderDate > new Date()) {
+          reminderItems.push({
+            id: parseInt(task.id.slice(0, 8), 16) || Date.now(),
+            title: 'Task Reminder',
+            body: task.text,
+            schedule: reminderDate,
+            recurring: task.repeatType !== 'none' ? task.repeatType : undefined,
+            type: 'task',
+            taskId: task.id,
+            task,
+          });
+        }
+      }
+    });
+
+    // Sort by schedule date
+    reminderItems.sort((a, b) => a.schedule.getTime() - b.schedule.getTime());
+    setReminders(reminderItems);
   };
 
   const formatReminderDate = (date: Date) => {
@@ -83,16 +170,18 @@ const Reminders = () => {
   const getRecurringBadge = (recurring?: string) => {
     if (!recurring || recurring === 'none') return null;
 
-    const labels = {
+    const labels: Record<string, string> = {
       daily: 'Daily',
       weekly: 'Weekly',
       monthly: 'Monthly',
+      yearly: 'Yearly',
+      hour: 'Hourly',
     };
 
     return (
       <Badge variant="secondary" className="gap-1">
         <Repeat className="h-3 w-3" />
-        {labels[recurring as keyof typeof labels]}
+        {labels[recurring] || recurring}
       </Badge>
     );
   };
@@ -107,7 +196,13 @@ const Reminders = () => {
   const ReminderCard = ({ reminder }: { reminder: ReminderItem }) => (
     <Card
       className="cursor-pointer hover:shadow-md transition-shadow"
-      onClick={() => reminder.note && navigate('/')}
+      onClick={() => {
+        if (reminder.type === 'task') {
+          navigate('/todo/today');
+        } else {
+          navigate('/');
+        }
+      }}
     >
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-3">
@@ -128,11 +223,12 @@ const Reminders = () => {
               {getRecurringBadge(reminder.recurring)}
             </div>
           </div>
-          {reminder.note && (
-            <Badge className="capitalize">
-              {reminder.note.type}
-            </Badge>
-          )}
+          <Badge className={cn(
+            "capitalize",
+            reminder.type === 'task' ? "bg-cyan-500" : "bg-purple-500"
+          )}>
+            {reminder.type}
+          </Badge>
         </div>
       </CardContent>
     </Card>
@@ -148,7 +244,7 @@ const Reminders = () => {
         </h2>
         <div className="space-y-3">
           {items.map((reminder) => (
-            <ReminderCard key={reminder.id} reminder={reminder} />
+            <ReminderCard key={`${reminder.type}-${reminder.id}`} reminder={reminder} />
           ))}
         </div>
       </div>
@@ -183,7 +279,7 @@ const Reminders = () => {
                 <Bell className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
                 <h2 className="text-xl font-semibold mb-2">No Upcoming Reminders</h2>
                 <p className="text-muted-foreground">
-                  Create notes with reminders to see them here
+                  Create tasks or notes with reminders to see them here
                 </p>
               </div>
             ) : (
@@ -222,36 +318,49 @@ const Reminders = () => {
                   </Button>
                 </div>
                 <div className="space-y-3">
-                  {historyItems.map((item) => (
-                    <Card key={item.id} className="cursor-pointer hover:shadow-md transition-shadow">
+                  {historyItems.map((item, index) => (
+                    <Card key={`${item.id}-${index}`} className={cn(
+                      "cursor-pointer hover:shadow-md transition-shadow",
+                      !item.read && "border-primary/50"
+                    )}>
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold truncate mb-1">
-                              {item.noteTitle}
+                              {item.title}
                             </h3>
-                            {item.noteContent && (
+                            {item.body && (
                               <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
-                                {item.noteContent}
+                                {item.body}
                               </p>
                             )}
                             <div className="flex items-center gap-2 flex-wrap">
-                              <Badge variant={item.wasOpened ? "default" : "secondary"} className="gap-1">
-                                <Bell className="h-3 w-3" />
-                                {item.wasOpened ? 'Opened' : 'Received'}
+                              <Badge variant={item.read ? "default" : "secondary"} className="gap-1">
+                                {item.read ? (
+                                  <CheckCircle2 className="h-3 w-3" />
+                                ) : (
+                                  <Bell className="h-3 w-3" />
+                                )}
+                                {item.read ? 'Read' : 'Unread'}
                               </Badge>
                               <Badge variant="outline" className="gap-1">
                                 <Clock className="h-3 w-3" />
-                                {format(new Date(item.triggeredAt), 'MMM dd, h:mm a')}
+                                {format(new Date(item.timestamp), 'MMM dd, h:mm a')}
                               </Badge>
-                              {item.recurring && item.recurring !== 'none' && (
+                              {item.extra?.recurringType && (
                                 <Badge variant="secondary" className="gap-1">
                                   <Repeat className="h-3 w-3" />
-                                  {item.recurring}
+                                  {item.extra.recurringType}
                                 </Badge>
                               )}
                             </div>
                           </div>
+                          <Badge className={cn(
+                            "capitalize",
+                            item.extra?.type === 'task' ? "bg-cyan-500" : "bg-purple-500"
+                          )}>
+                            {item.extra?.type || 'notification'}
+                          </Badge>
                         </div>
                       </CardContent>
                     </Card>

@@ -1,9 +1,20 @@
-import { LocalNotifications } from '@capacitor/local-notifications';
-import { TodoItem } from '@/types/note';
+import { LocalNotifications, LocalNotificationSchema, ActionPerformed } from '@capacitor/local-notifications';
+import { TodoItem, Note } from '@/types/note';
+import { RepeatSettings, RepeatFrequency } from '@/components/TaskDateTimePage';
+import { addMinutes, addHours, addDays, addWeeks, addMonths, addYears } from 'date-fns';
+
+export interface NotificationData {
+  taskId?: string;
+  noteId?: string;
+  type: 'task' | 'note';
+  recurring?: boolean;
+  recurringType?: string;
+}
 
 export class NotificationManager {
   private static instance: NotificationManager;
   private permissionGranted = false;
+  private initialized = false;
 
   private constructor() {}
 
@@ -12,6 +23,81 @@ export class NotificationManager {
       NotificationManager.instance = new NotificationManager();
     }
     return NotificationManager.instance;
+  }
+
+  async initialize(): Promise<void> {
+    if (this.initialized) return;
+
+    try {
+      // Request permissions
+      await this.requestPermissions();
+
+      // Set up notification listeners
+      await this.setupListeners();
+
+      this.initialized = true;
+      console.log('NotificationManager initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize NotificationManager:', error);
+    }
+  }
+
+  private async setupListeners(): Promise<void> {
+    try {
+      // Listen for notification received
+      await LocalNotifications.addListener('localNotificationReceived', (notification) => {
+        console.log('Notification received:', notification);
+        this.handleNotificationReceived(notification);
+      });
+
+      // Listen for notification action performed (user tapped on notification)
+      await LocalNotifications.addListener('localNotificationActionPerformed', (action: ActionPerformed) => {
+        console.log('Notification action performed:', action);
+        this.handleNotificationAction(action);
+      });
+
+      console.log('Notification listeners set up successfully');
+    } catch (error) {
+      console.error('Error setting up notification listeners:', error);
+    }
+  }
+
+  private handleNotificationReceived(notification: LocalNotificationSchema): void {
+    // Store notification in history
+    const history = JSON.parse(localStorage.getItem('notificationHistory') || '[]');
+    history.unshift({
+      id: notification.id,
+      title: notification.title,
+      body: notification.body,
+      timestamp: new Date().toISOString(),
+      read: false,
+      extra: notification.extra,
+    });
+    // Keep only last 100 notifications
+    localStorage.setItem('notificationHistory', JSON.stringify(history.slice(0, 100)));
+    
+    // Dispatch event for real-time updates
+    window.dispatchEvent(new CustomEvent('notificationReceived', { detail: notification }));
+  }
+
+  private handleNotificationAction(action: ActionPerformed): void {
+    const notification = action.notification;
+    const extra = notification.extra as NotificationData | undefined;
+
+    if (extra?.taskId) {
+      // Navigate to task or mark as read
+      window.dispatchEvent(new CustomEvent('taskNotificationTapped', { detail: { taskId: extra.taskId } }));
+    } else if (extra?.noteId) {
+      // Navigate to note
+      window.dispatchEvent(new CustomEvent('noteNotificationTapped', { detail: { noteId: extra.noteId } }));
+    }
+
+    // Mark as read in history
+    const history = JSON.parse(localStorage.getItem('notificationHistory') || '[]');
+    const updatedHistory = history.map((item: any) =>
+      item.id === notification.id ? { ...item, read: true } : item
+    );
+    localStorage.setItem('notificationHistory', JSON.stringify(updatedHistory));
   }
 
   async requestPermissions(): Promise<boolean> {
@@ -36,8 +122,52 @@ export class NotificationManager {
     }
   }
 
-  async scheduleTaskReminder(task: TodoItem, recurringType?: 'daily' | 'weekly' | 'monthly', recurringCount: number = 30): Promise<number[]> {
-    if (!task.reminderTime) return [];
+  private calculateReminderTime(baseDate: Date, reminderOffset: string): Date {
+    switch (reminderOffset) {
+      case '5min':
+        return addMinutes(baseDate, -5);
+      case '10min':
+        return addMinutes(baseDate, -10);
+      case '15min':
+        return addMinutes(baseDate, -15);
+      case '30min':
+        return addMinutes(baseDate, -30);
+      case '1hour':
+        return addHours(baseDate, -1);
+      case '2hours':
+        return addHours(baseDate, -2);
+      case '1day':
+        return addDays(baseDate, -1);
+      default:
+        return baseDate;
+    }
+  }
+
+  private getNextOccurrence(baseDate: Date, frequency: RepeatFrequency, interval: number, occurrence: number): Date {
+    const totalInterval = interval * occurrence;
+    
+    switch (frequency) {
+      case 'hour':
+        return addHours(baseDate, totalInterval);
+      case 'daily':
+        return addDays(baseDate, totalInterval);
+      case 'weekly':
+        return addWeeks(baseDate, totalInterval);
+      case 'monthly':
+        return addMonths(baseDate, totalInterval);
+      case 'yearly':
+        return addYears(baseDate, totalInterval);
+      default:
+        return baseDate;
+    }
+  }
+
+  async scheduleTaskReminder(
+    task: TodoItem,
+    reminderOffset?: string,
+    repeatSettings?: RepeatSettings
+  ): Promise<number[]> {
+    if (!task.dueDate && !task.reminderTime) return [];
 
     const hasPermission = await this.checkPermissions();
     if (!hasPermission) {
@@ -51,50 +181,92 @@ export class NotificationManager {
       await this.cancelTaskReminder(task.id);
 
       const baseNotificationId = parseInt(task.id.slice(0, 8), 16) || Date.now();
-      const reminderDate = new Date(task.reminderTime);
+      const baseDate = task.reminderTime 
+        ? new Date(task.reminderTime) 
+        : new Date(task.dueDate!);
+      
       const notificationIds: number[] = [];
-      const notifications: any[] = [];
+      const notifications: LocalNotificationSchema[] = [];
 
-      if (recurringType) {
-        for (let i = 0; i < recurringCount; i++) {
-          const occurrenceDate = new Date(reminderDate);
+      // Calculate reminder time based on offset
+      const reminderTime = reminderOffset 
+        ? this.calculateReminderTime(baseDate, reminderOffset)
+        : baseDate;
 
-          if (recurringType === 'daily') {
-            occurrenceDate.setDate(occurrenceDate.getDate() + i);
-          } else if (recurringType === 'weekly') {
-            occurrenceDate.setDate(occurrenceDate.getDate() + (i * 7));
-          } else if (recurringType === 'monthly') {
-            occurrenceDate.setMonth(occurrenceDate.getMonth() + i);
+      if (repeatSettings && repeatSettings.frequency) {
+        // Calculate how many occurrences to schedule
+        let maxOccurrences = 30; // Default
+        
+        if (repeatSettings.endsType === 'after_occurrences' && repeatSettings.endsAfterOccurrences) {
+          maxOccurrences = repeatSettings.endsAfterOccurrences;
+        } else if (repeatSettings.endsType === 'on_date' && repeatSettings.endsOnDate) {
+          // Calculate occurrences until end date
+          const now = new Date();
+          const endDate = new Date(repeatSettings.endsOnDate);
+          let count = 0;
+          let checkDate = reminderTime;
+          
+          while (checkDate <= endDate && count < 365) {
+            if (checkDate > now) count++;
+            checkDate = this.getNextOccurrence(reminderTime, repeatSettings.frequency, repeatSettings.interval, count + 1);
+          }
+          maxOccurrences = Math.min(count, 365);
+        }
+
+        for (let i = 0; i < maxOccurrences; i++) {
+          const occurrenceDate = this.getNextOccurrence(reminderTime, repeatSettings.frequency, repeatSettings.interval, i);
+          
+          // For weekly repeats, check if day is in selected days
+          if (repeatSettings.frequency === 'weekly' && repeatSettings.weeklyDays && repeatSettings.weeklyDays.length > 0) {
+            if (!repeatSettings.weeklyDays.includes(occurrenceDate.getDay())) {
+              continue;
+            }
+          }
+
+          // For monthly repeats, set specific day
+          if (repeatSettings.frequency === 'monthly' && repeatSettings.monthlyDay) {
+            occurrenceDate.setDate(repeatSettings.monthlyDay);
           }
 
           if (occurrenceDate > new Date()) {
             const notificationId = baseNotificationId + i;
             notificationIds.push(notificationId);
 
+            const frequencyLabel = repeatSettings.frequency.charAt(0).toUpperCase() + repeatSettings.frequency.slice(1);
+            
             notifications.push({
               id: notificationId,
-              title: `Task Reminder ${recurringType === 'daily' ? '(Daily)' : recurringType === 'weekly' ? '(Weekly)' : '(Monthly)'}`,
+              title: `Task Reminder (${frequencyLabel})`,
               body: task.text,
               schedule: { at: occurrenceDate },
               sound: undefined,
               attachments: undefined,
               actionTypeId: '',
-              extra: { taskId: task.id, recurring: true, recurringType },
+              extra: {
+                taskId: task.id,
+                type: 'task',
+                recurring: true,
+                recurringType: repeatSettings.frequency,
+              } as NotificationData,
             });
           }
         }
       } else {
-        if (reminderDate > new Date()) {
+        // Single notification
+        if (reminderTime > new Date()) {
           notificationIds.push(baseNotificationId);
           notifications.push({
             id: baseNotificationId,
             title: 'Task Reminder',
             body: task.text,
-            schedule: { at: reminderDate },
+            schedule: { at: reminderTime },
             sound: undefined,
             attachments: undefined,
             actionTypeId: '',
-            extra: { taskId: task.id },
+            extra: {
+              taskId: task.id,
+              type: 'task',
+            } as NotificationData,
           });
         }
       }
@@ -111,6 +283,75 @@ export class NotificationManager {
     }
   }
 
+  async scheduleNoteReminder(note: Note): Promise<number[]> {
+    if (!note.reminderTime || !note.reminderEnabled) return [];
+
+    const hasPermission = await this.checkPermissions();
+    if (!hasPermission) {
+      const granted = await this.requestPermissions();
+      if (!granted) {
+        throw new Error('Notification permissions not granted');
+      }
+    }
+
+    try {
+      await this.cancelNoteReminder(note.id);
+
+      const baseNotificationId = parseInt(note.id.slice(0, 8), 16) || Date.now();
+      const reminderDate = new Date(note.reminderTime);
+      const notificationIds: number[] = [];
+      const notifications: LocalNotificationSchema[] = [];
+
+      const recurring = note.reminderRecurring && note.reminderRecurring !== 'none';
+      const maxOccurrences = recurring ? 30 : 1;
+
+      for (let i = 0; i < maxOccurrences; i++) {
+        const occurrenceDate = new Date(reminderDate);
+
+        if (note.reminderRecurring === 'daily') {
+          occurrenceDate.setDate(occurrenceDate.getDate() + i);
+        } else if (note.reminderRecurring === 'weekly') {
+          occurrenceDate.setDate(occurrenceDate.getDate() + (i * 7));
+        } else if (note.reminderRecurring === 'monthly') {
+          occurrenceDate.setMonth(occurrenceDate.getMonth() + i);
+        }
+
+        if (occurrenceDate > new Date()) {
+          const notificationId = baseNotificationId + i;
+          notificationIds.push(notificationId);
+
+          notifications.push({
+            id: notificationId,
+            title: recurring
+              ? `Note Reminder (${note.reminderRecurring?.charAt(0).toUpperCase()}${note.reminderRecurring?.slice(1)})`
+              : 'Note Reminder',
+            body: note.title || 'You have a note reminder',
+            schedule: { at: occurrenceDate },
+            sound: undefined,
+            attachments: undefined,
+            actionTypeId: '',
+            extra: {
+              noteId: note.id,
+              type: 'note',
+              recurring,
+              recurringType: note.reminderRecurring,
+            } as NotificationData,
+          });
+        }
+      }
+
+      if (notifications.length > 0) {
+        await LocalNotifications.schedule({ notifications });
+        console.log(`Scheduled ${notifications.length} notification(s) for note: ${note.title}`);
+      }
+
+      return notificationIds;
+    } catch (error) {
+      console.error('Error scheduling note notification:', error);
+      throw error;
+    }
+  }
+
   async cancelTaskReminder(taskId: string, notificationIds?: number[]): Promise<void> {
     try {
       if (notificationIds && notificationIds.length > 0) {
@@ -120,13 +361,32 @@ export class NotificationManager {
       } else {
         const baseNotificationId = parseInt(taskId.slice(0, 8), 16) || Date.now();
         const idsToCancel = [];
-        for (let i = 0; i < 100; i++) {
+        for (let i = 0; i < 365; i++) {
           idsToCancel.push({ id: baseNotificationId + i });
         }
         await LocalNotifications.cancel({ notifications: idsToCancel });
       }
     } catch (error) {
       console.error('Error canceling notification:', error);
+    }
+  }
+
+  async cancelNoteReminder(noteId: string, notificationIds?: number[]): Promise<void> {
+    try {
+      if (notificationIds && notificationIds.length > 0) {
+        await LocalNotifications.cancel({
+          notifications: notificationIds.map(id => ({ id }))
+        });
+      } else {
+        const baseNotificationId = parseInt(noteId.slice(0, 8), 16) || Date.now();
+        const idsToCancel = [];
+        for (let i = 0; i < 100; i++) {
+          idsToCancel.push({ id: baseNotificationId + i });
+        }
+        await LocalNotifications.cancel({ notifications: idsToCancel });
+      }
+    } catch (error) {
+      console.error('Error canceling note notification:', error);
     }
   }
 
@@ -141,10 +401,20 @@ export class NotificationManager {
     }
   }
 
+  async getPendingNotifications(): Promise<LocalNotificationSchema[]> {
+    try {
+      const pending = await LocalNotifications.getPending();
+      return pending.notifications;
+    } catch (error) {
+      console.error('Error getting pending notifications:', error);
+      return [];
+    }
+  }
+
   async rescheduleAllTasks(tasks: TodoItem[]): Promise<void> {
     await this.cancelAllReminders();
     for (const task of tasks) {
-      if (task.reminderTime && !task.completed) {
+      if ((task.reminderTime || task.dueDate) && !task.completed) {
         try {
           await this.scheduleTaskReminder(task);
         } catch (error) {
@@ -152,6 +422,22 @@ export class NotificationManager {
         }
       }
     }
+  }
+
+  getNotificationHistory(): any[] {
+    return JSON.parse(localStorage.getItem('notificationHistory') || '[]');
+  }
+
+  clearNotificationHistory(): void {
+    localStorage.setItem('notificationHistory', JSON.stringify([]));
+  }
+
+  markNotificationAsRead(notificationId: number): void {
+    const history = JSON.parse(localStorage.getItem('notificationHistory') || '[]');
+    const updatedHistory = history.map((item: any) =>
+      item.id === notificationId ? { ...item, read: true } : item
+    );
+    localStorage.setItem('notificationHistory', JSON.stringify(updatedHistory));
   }
 }
 

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,12 +14,18 @@ import Upcoming from "./pages/todo/Upcoming";
 import TodoCalendar from "./pages/todo/TodoCalendar";
 import TodoSettings from "./pages/todo/TodoSettings";
 import NotFound from "./pages/NotFound";
+import { notificationManager } from "@/utils/notifications";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
+const AppContent = () => {
+  useEffect(() => {
+    // Initialize notification system
+    notificationManager.initialize().catch(console.error);
+  }, []);
+
+  return (
+    <>
       <Toaster />
       <Sonner />
       <BrowserRouter>
@@ -36,6 +43,14 @@ const App = () => (
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
+    </>
+  );
+};
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <AppContent />
     </TooltipProvider>
   </QueryClientProvider>
 );
