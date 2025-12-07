@@ -17,7 +17,8 @@ import { PrioritySelectSheet } from '@/components/PrioritySelectSheet';
 import { BatchTaskSheet } from '@/components/BatchTaskSheet';
 import { SectionEditSheet } from '@/components/SectionEditSheet';
 import { SectionMoveSheet } from '@/components/SectionMoveSheet';
-import { DraggableTaskList } from '@/components/DraggableTaskList';
+import { UnifiedDragDropList } from '@/components/UnifiedDragDropList';
+import { SubtaskDetailSheet } from '@/components/SubtaskDetailSheet';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { notificationManager } from '@/utils/notifications';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -57,6 +58,7 @@ const Today = () => {
   const [isSectionEditOpen, setIsSectionEditOpen] = useState(false);
   const [isSectionMoveOpen, setIsSectionMoveOpen] = useState(false);
   const [editingSection, setEditingSection] = useState<TaskSection | null>(null);
+  const [selectedSubtask, setSelectedSubtask] = useState<{ subtask: TodoItem; parentId: string } | null>(null);
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -271,16 +273,62 @@ const Today = () => {
     setItems(items.filter((item) => item.id !== itemId));
   };
 
-  // Reorder tasks within a section
-  const handleReorderTasks = useCallback((sectionId: string, reorderedTasks: TodoItem[]) => {
+  // Unified reorder handler for drag-and-drop
+  const handleUnifiedReorder = useCallback((updatedItems: TodoItem[]) => {
     setItems(prevItems => {
-      // Get all items not in this section
-      const otherItems = prevItems.filter(item => {
-        const itemSectionId = item.sectionId || sections[0]?.id;
-        return itemSectionId !== sectionId || item.completed;
+      // Keep completed items unchanged
+      const completedItems = prevItems.filter(item => item.completed);
+      return [...updatedItems, ...completedItems];
+    });
+  }, []);
+
+  // Handle subtask updates
+  const handleUpdateSubtaskFromSheet = useCallback((parentId: string, subtaskId: string, updates: Partial<TodoItem>) => {
+    setItems(prevItems => prevItems.map(item => {
+      if (item.id === parentId && item.subtasks) {
+        return {
+          ...item,
+          subtasks: item.subtasks.map(st => st.id === subtaskId ? { ...st, ...updates } : st)
+        };
+      }
+      return item;
+    }));
+  }, []);
+
+  // Handle subtask deletion
+  const handleDeleteSubtaskFromSheet = useCallback((parentId: string, subtaskId: string) => {
+    setItems(prevItems => prevItems.map(item => {
+      if (item.id === parentId && item.subtasks) {
+        return {
+          ...item,
+          subtasks: item.subtasks.filter(st => st.id !== subtaskId)
+        };
+      }
+      return item;
+    }));
+  }, []);
+
+  // Convert subtask to main task
+  const handleConvertSubtaskToTask = useCallback((parentId: string, subtask: TodoItem) => {
+    setItems(prevItems => {
+      // Remove subtask from parent
+      const updatedItems = prevItems.map(item => {
+        if (item.id === parentId && item.subtasks) {
+          return {
+            ...item,
+            subtasks: item.subtasks.filter(st => st.id !== subtask.id)
+          };
+        }
+        return item;
       });
-      // Combine with reordered tasks
-      return [...reorderedTasks, ...otherItems];
+      
+      // Add as new main task
+      const newTask: TodoItem = {
+        ...subtask,
+        sectionId: prevItems.find(i => i.id === parentId)?.sectionId || sections[0]?.id,
+      };
+      
+      return [newTask, ...updatedItems];
     });
   }, [sections]);
 
@@ -769,89 +817,75 @@ const Today = () => {
 
   const sortedSections = [...sections].sort((a, b) => a.order - b.order);
 
-  const renderSection = (section: TaskSection) => {
+  const renderSectionHeader = (section: TaskSection) => {
     const sectionTasks = uncompletedItems.filter(item => item.sectionId === section.id || (!item.sectionId && section.id === sections[0]?.id));
     
     return (
-      <div key={section.id} className="rounded-xl overflow-hidden border border-border/30">
-        <div className="flex items-center" style={{ borderLeft: `4px solid ${section.color}` }}>
-          <div className="flex-1 flex items-center gap-3 px-3 py-2.5 bg-muted/30">
-            <span className="text-sm font-semibold">{section.name}</span>
-            <span className="text-xs text-muted-foreground">({sectionTasks.length})</span>
-          </div>
-          
-          {/* Collapse button */}
-          <button
-            onClick={() => handleToggleSectionCollapse(section.id)}
-            className="p-2 hover:bg-muted/50 transition-colors"
-          >
-            {section.isCollapsed ? (
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            ) : (
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            )}
-          </button>
-
-          {/* Options menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="p-2 hover:bg-muted/50 transition-colors">
-                <MoreVertical className="h-4 w-4 text-muted-foreground" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 bg-popover border shadow-lg z-50">
-              <DropdownMenuItem onClick={() => handleEditSection(section)} className="cursor-pointer">
-                <Edit className="h-4 w-4 mr-2" />Edit Section
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleAddTaskToSection(section.id)} className="cursor-pointer">
-                <PlusIcon className="h-4 w-4 mr-2" />Add Task
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleAddSection('above', section.id)} className="cursor-pointer">
-                <ArrowUpCircle className="h-4 w-4 mr-2" />Add Section Above
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleAddSection('below', section.id)} className="cursor-pointer">
-                <ArrowDownCircle className="h-4 w-4 mr-2" />Add Section Below
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleDuplicateSection(section.id)} className="cursor-pointer">
-                <Copy className="h-4 w-4 mr-2" />Duplicate Section
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { setEditingSection(section); setIsSectionMoveOpen(true); }} className="cursor-pointer">
-                <Move className="h-4 w-4 mr-2" />Move to
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                onClick={() => handleDeleteSection(section.id)} 
-                className="cursor-pointer text-destructive focus:text-destructive"
-                disabled={sections.length <= 1}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+      <div className="flex items-center" style={{ borderLeft: `4px solid ${section.color}` }}>
+        <div className="flex-1 flex items-center gap-3 px-3 py-2.5 bg-muted/30">
+          <span className="text-sm font-semibold">{section.name}</span>
+          <span className="text-xs text-muted-foreground">({sectionTasks.length})</span>
         </div>
         
-        {!section.isCollapsed && (
-          <div className="bg-background" style={{ borderLeft: `4px solid ${section.color}` }}>
-            {sectionTasks.length > 0 ? (
-              <DraggableTaskList
-                items={sectionTasks}
-                onReorder={(reordered) => handleReorderTasks(section.id, reordered)}
-                renderItem={(item, isDragging, isDropTarget) => (
-                  <div className={cn(isDragging && "bg-card rounded-lg")}>
-                    {renderTaskItem(item)}
-                  </div>
-                )}
-              />
-            ) : (
-              <div className="py-4 px-4 text-center text-sm text-muted-foreground">
-                No tasks in this section
-              </div>
-            )}
-          </div>
-        )}
+        {/* Collapse button */}
+        <button
+          onClick={() => handleToggleSectionCollapse(section.id)}
+          className="p-2 hover:bg-muted/50 transition-colors"
+        >
+          {section.isCollapsed ? (
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          )}
+        </button>
+
+        {/* Options menu */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="p-2 hover:bg-muted/50 transition-colors">
+              <MoreVertical className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48 bg-popover border shadow-lg z-50">
+            <DropdownMenuItem onClick={() => handleEditSection(section)} className="cursor-pointer">
+              <Edit className="h-4 w-4 mr-2" />Edit Section
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleAddTaskToSection(section.id)} className="cursor-pointer">
+              <PlusIcon className="h-4 w-4 mr-2" />Add Task
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => handleAddSection('above', section.id)} className="cursor-pointer">
+              <ArrowUpCircle className="h-4 w-4 mr-2" />Add Section Above
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleAddSection('below', section.id)} className="cursor-pointer">
+              <ArrowDownCircle className="h-4 w-4 mr-2" />Add Section Below
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleDuplicateSection(section.id)} className="cursor-pointer">
+              <Copy className="h-4 w-4 mr-2" />Duplicate Section
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => { setEditingSection(section); setIsSectionMoveOpen(true); }} className="cursor-pointer">
+              <Move className="h-4 w-4 mr-2" />Move to
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              onClick={() => handleDeleteSection(section.id)} 
+              className="cursor-pointer text-destructive focus:text-destructive"
+              disabled={sections.length <= 1}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     );
+  };
+
+  const handleSubtaskClick = (subtask: TodoItem, parentId?: string) => {
+    if (parentId) {
+      setSelectedSubtask({ subtask, parentId });
+    } else {
+      setSelectedTask(subtask);
+    }
   };
 
   return (
@@ -937,9 +971,47 @@ const Today = () => {
             <div className="text-center py-20"><p className="text-muted-foreground">No tasks yet. Tap "Add Task" to get started!</p></div>
           ) : (
             <div className="space-y-4">
-              {/* Render sections with their tasks */}
-              {sortedSections.map(renderSection)}
-
+              {/* Render sections with unified drag-drop */}
+              <UnifiedDragDropList
+                sections={sortedSections}
+                items={uncompletedItems}
+                onReorder={handleUnifiedReorder}
+                onTaskClick={handleSubtaskClick}
+                expandedTasks={expandedTasks}
+                renderSectionHeader={renderSectionHeader}
+                renderEmptySection={(section) => (
+                  <div className="py-4 px-4 text-center text-sm text-muted-foreground">
+                    No tasks in this section
+                  </div>
+                )}
+                renderTask={(item, isDragging, isDropTarget) => (
+                  <div className={cn(isDragging && "bg-card rounded-lg")}>
+                    {renderTaskItem(item)}
+                  </div>
+                )}
+                renderSubtask={(subtask, parentId, isDragging) => (
+                  <div className={cn(
+                    "flex items-start gap-3 py-2 px-3 border-b border-border/30 last:border-b-0 cursor-pointer",
+                    isDragging && "bg-card shadow-lg"
+                  )}>
+                    <Checkbox
+                      checked={subtask.completed}
+                      onCheckedChange={async (checked) => {
+                        updateSubtask(parentId, subtask.id, { completed: !!checked });
+                        if (checked) try { await Haptics.impact({ style: ImpactStyle.Light }); } catch {}
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className={cn(
+                        "h-4 w-4 rounded-sm mt-0.5 flex-shrink-0",
+                        subtask.completed ? "bg-muted-foreground/30 border-0" : "border-2 border-muted-foreground/40"
+                      )}
+                    />
+                    <span className={cn("text-sm flex-1", subtask.completed && "text-muted-foreground")}>
+                      {subtask.text}
+                    </span>
+                  </div>
+                )}
+              />
               {/* Completed Section */}
               {showCompleted && completedItems.length > 0 && (
                 <Collapsible open={isCompletedOpen} onOpenChange={setIsCompletedOpen}>
@@ -994,6 +1066,15 @@ const Today = () => {
         sections={sections} 
         currentSectionId={editingSection?.id || ''} 
         onMoveToPosition={(targetIndex) => editingSection && handleMoveSection(editingSection.id, targetIndex)} 
+      />
+      <SubtaskDetailSheet
+        isOpen={!!selectedSubtask}
+        subtask={selectedSubtask?.subtask || null}
+        parentId={selectedSubtask?.parentId || null}
+        onClose={() => setSelectedSubtask(null)}
+        onUpdate={handleUpdateSubtaskFromSheet}
+        onDelete={handleDeleteSubtaskFromSheet}
+        onConvertToTask={handleConvertSubtaskToTask}
       />
 
       <Dialog open={!!selectedImage} onOpenChange={(open) => !open && setSelectedImage(null)}>
