@@ -21,13 +21,13 @@ const LONG_PRESS_DELAY = 200;
 
 interface DragItem {
   id: string;
-  type: 'task' | 'subtask' | 'section';
+  type: 'task' | 'subtask';
   parentId?: string;
   sectionId?: string;
 }
 
 interface DropTarget {
-  type: 'section' | 'task' | 'subtask-area' | 'section-reorder';
+  type: 'section' | 'task' | 'subtask-area';
   sectionId?: string;
   taskId?: string;
   position?: 'before' | 'after';
@@ -150,35 +150,6 @@ export const UnifiedDragDropList = ({
   const findDropTarget = useCallback((draggedElementCurrentTop: number): DropTarget | null => {
     if (!dragState.draggedItem) return null;
 
-    // If dragging a section, only look for section reorder targets
-    if (dragState.draggedItem.type === 'section') {
-      let closestTarget: DropTarget | null = null;
-      let closestDistance = Infinity;
-
-      sectionRefs.current.forEach((ref, sectionId) => {
-        if (sectionId === dragState.draggedItem?.id) return;
-        
-        const rect = ref.getBoundingClientRect();
-        const sectionCenterY = rect.top + rect.height / 2;
-        
-        if (draggedElementCurrentTop < sectionCenterY) {
-          const distance = Math.abs(draggedElementCurrentTop - rect.top);
-          if (distance < closestDistance) {
-            closestDistance = distance;
-            closestTarget = { type: 'section-reorder', sectionId, position: 'before' };
-          }
-        } else {
-          const distance = Math.abs(draggedElementCurrentTop - rect.bottom);
-          if (distance < closestDistance) {
-            closestDistance = distance;
-            closestTarget = { type: 'section-reorder', sectionId, position: 'after' };
-          }
-        }
-      });
-
-      return closestTarget;
-    }
-
     let closestTarget: DropTarget | null = null;
     let closestDistance = Infinity;
 
@@ -280,31 +251,6 @@ export const UnifiedDragDropList = ({
       try {
         Haptics.impact({ style: ImpactStyle.Heavy });
       } catch {}
-
-      // Handle section reordering
-      if (draggedItem.type === 'section' && dropTarget.type === 'section-reorder' && dropTarget.sectionId) {
-        const draggedSectionIndex = sections.findIndex(s => s.id === draggedItem.id);
-        const targetSectionIndex = sections.findIndex(s => s.id === dropTarget.sectionId);
-        
-        if (draggedSectionIndex !== -1 && targetSectionIndex !== -1) {
-          const newSections = [...sections];
-          const [movedSection] = newSections.splice(draggedSectionIndex, 1);
-          
-          const insertIndex = dropTarget.position === 'after' ? targetSectionIndex + 1 : targetSectionIndex;
-          const adjustedIndex = draggedSectionIndex < targetSectionIndex && dropTarget.position === 'after' 
-            ? insertIndex - 1 
-            : insertIndex;
-          
-          newSections.splice(adjustedIndex < 0 ? 0 : adjustedIndex, 0, movedSection);
-          
-          // Update order values
-          const updatedSections = newSections.map((s, idx) => ({ ...s, order: idx }));
-          onSectionReorder(updatedSections);
-        }
-        
-        setDragState({ isDragging: false, draggedItem: null, translateY: 0, startY: 0, currentY: 0, dropTarget: null, draggedElementTop: 0 });
-        return;
-      }
 
       let newItems = [...items];
 
@@ -487,8 +433,6 @@ export const UnifiedDragDropList = ({
           !item.completed && (item.sectionId === section.id || (!item.sectionId && section.id === sections[0]?.id))
         );
         const isDropTargetSection = dragState.dropTarget?.type === 'section' && dragState.dropTarget.sectionId === section.id;
-        const isSectionDragging = dragState.draggedItem?.id === section.id && dragState.draggedItem?.type === 'section';
-        const isSectionReorderTarget = dragState.dropTarget?.type === 'section-reorder' && dragState.dropTarget.sectionId === section.id;
 
         return (
           <div 
@@ -496,35 +440,10 @@ export const UnifiedDragDropList = ({
             ref={(ref) => setSectionRef(section.id, ref)}
             className={cn(
               "rounded-xl overflow-hidden border border-border/30 relative",
-              isDropTargetSection && "ring-2 ring-blue-500 bg-blue-500/5",
-              isSectionDragging && "z-50 opacity-90 scale-[1.02] shadow-xl"
+              isDropTargetSection && "ring-2 ring-blue-500 bg-blue-500/5"
             )}
-            style={{
-              transform: isSectionDragging ? `translateY(${dragState.translateY}px)` : undefined,
-            }}
-            onTouchStart={(e) => handleTouchStart({ id: section.id, type: 'section' }, e)}
           >
-            {/* Section reorder drop indicator - before */}
-            {isSectionReorderTarget && dragState.dropTarget?.position === 'before' && (
-              <div 
-                className="absolute left-0 right-0 h-1 bg-purple-500 rounded-full z-40 shadow-[0_0_8px_2px_rgba(168,85,247,0.5)]"
-                style={{ top: '-4px' }}
-              >
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-purple-500 rounded-full shadow-lg" />
-              </div>
-            )}
-            
-            {renderSectionHeader(section, isSectionDragging)}
-            
-            {/* Section reorder drop indicator - after */}
-            {isSectionReorderTarget && dragState.dropTarget?.position === 'after' && (
-              <div 
-                className="absolute left-0 right-0 h-1 bg-purple-500 rounded-full z-40 shadow-[0_0_8px_2px_rgba(168,85,247,0.5)]"
-                style={{ bottom: '-4px' }}
-              >
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-purple-500 rounded-full shadow-lg" />
-              </div>
-            )}
+            {renderSectionHeader(section, false)}
             
             {!section.isCollapsed && (
               <div 
