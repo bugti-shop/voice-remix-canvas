@@ -21,8 +21,10 @@ import {
   Paperclip,
   Tag,
   X,
-  Image as ImageIcon
+  Image as ImageIcon,
+  MapPin
 } from 'lucide-react';
+import { LocationMapPreview } from './LocationMapPreview';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -455,6 +457,15 @@ export const TaskDetailPage = ({
           <div className="rounded-xl overflow-hidden border border-border">
             <img src={task.imageUrl} alt="Task attachment" className="w-full max-h-48 object-cover" />
           </div>
+        )}
+
+        {/* Location Map Display */}
+        {task.location && (
+          <LocationMapPreview 
+            location={task.location} 
+            showFullMap={true}
+            onClose={() => onUpdate({ ...task, location: undefined })}
+          />
         )}
 
         {/* Subtasks */}
