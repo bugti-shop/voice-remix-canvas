@@ -88,12 +88,12 @@ export const BatchTaskSheet = ({ isOpen, onClose, onAddTasks, sections = [], fol
                 <LayoutList className="h-3.5 w-3.5" />
                 Section
               </label>
-              <Select value={selectedSection} onValueChange={setSelectedSection}>
+              <Select value={selectedSection || "no-section"} onValueChange={(v) => setSelectedSection(v === "no-section" ? "" : v)}>
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="No section" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">No section</SelectItem>
+                <SelectContent className="bg-popover">
+                  <SelectItem value="no-section">No section</SelectItem>
                   {sections.map((section) => (
                     <SelectItem key={section.id} value={section.id}>
                       <div className="flex items-center gap-2">
@@ -114,12 +114,12 @@ export const BatchTaskSheet = ({ isOpen, onClose, onAddTasks, sections = [], fol
                 <FolderIcon className="h-3.5 w-3.5" />
                 Folder
               </label>
-              <Select value={selectedFolder} onValueChange={setSelectedFolder}>
+              <Select value={selectedFolder || "no-folder"} onValueChange={(v) => setSelectedFolder(v === "no-folder" ? "" : v)}>
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="No folder" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">No folder</SelectItem>
+                <SelectContent className="bg-popover">
+                  <SelectItem value="no-folder">No folder</SelectItem>
                   {folders.map((folder) => (
                     <SelectItem key={folder.id} value={folder.id}>
                       <div className="flex items-center gap-2">
@@ -153,7 +153,7 @@ export const BatchTaskSheet = ({ isOpen, onClose, onAddTasks, sections = [], fol
                     </span>
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-popover">
                   {priorityOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       <span className={cn(option.color)}>{option.label}</span>
