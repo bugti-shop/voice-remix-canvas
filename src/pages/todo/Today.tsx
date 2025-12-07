@@ -142,13 +142,13 @@ const Today = () => {
     setInputSectionId(null);
   };
 
-  const handleBatchAddTasks = (taskTexts: string[]) => {
+  const handleBatchAddTasks = (taskTexts: string[], sectionId?: string, folderId?: string) => {
     const newItems: TodoItem[] = taskTexts.map((text, idx) => ({
       id: `${Date.now()}-${idx}`,
       text,
       completed: false,
-      folderId: selectedFolderId || undefined,
-      sectionId: inputSectionId || sections[0]?.id,
+      folderId: folderId || selectedFolderId || undefined,
+      sectionId: sectionId || inputSectionId || sections[0]?.id,
     }));
     setItems([...newItems, ...items]);
     toast.success(`Added ${newItems.length} task(s)`);
@@ -959,7 +959,7 @@ const Today = () => {
       <MoveToFolderSheet isOpen={isMoveToFolderOpen} onClose={() => setIsMoveToFolderOpen(false)} folders={folders} onSelect={handleMoveToFolder} />
       <SelectActionsSheet isOpen={isSelectActionsOpen} onClose={() => setIsSelectActionsOpen(false)} selectedCount={selectedTaskIds.size} onAction={handleSelectAction} />
       <PrioritySelectSheet isOpen={isPrioritySheetOpen} onClose={() => setIsPrioritySheetOpen(false)} onSelect={handleSetPriority} />
-      <BatchTaskSheet isOpen={isBatchTaskOpen} onClose={() => setIsBatchTaskOpen(false)} onAddTasks={handleBatchAddTasks} />
+      <BatchTaskSheet isOpen={isBatchTaskOpen} onClose={() => setIsBatchTaskOpen(false)} onAddTasks={handleBatchAddTasks} sections={sections} folders={folders} />
       <SectionEditSheet 
         isOpen={isSectionEditOpen} 
         onClose={() => { setIsSectionEditOpen(false); setEditingSection(null); }} 
