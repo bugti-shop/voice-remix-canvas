@@ -282,6 +282,11 @@ const Today = () => {
     });
   }, []);
 
+  // Section reorder handler for drag-and-drop
+  const handleSectionReorder = useCallback((updatedSections: TaskSection[]) => {
+    setSections(updatedSections);
+  }, []);
+
   // Handle subtask updates
   const handleUpdateSubtaskFromSheet = useCallback((parentId: string, subtaskId: string, updates: Partial<TodoItem>) => {
     setItems(prevItems => prevItems.map(item => {
@@ -817,11 +822,17 @@ const Today = () => {
 
   const sortedSections = [...sections].sort((a, b) => a.order - b.order);
 
-  const renderSectionHeader = (section: TaskSection) => {
+  const renderSectionHeader = (section: TaskSection, isDragging: boolean = false) => {
     const sectionTasks = uncompletedItems.filter(item => item.sectionId === section.id || (!item.sectionId && section.id === sections[0]?.id));
     
     return (
-      <div className="flex items-center" style={{ borderLeft: `4px solid ${section.color}` }}>
+      <div 
+        className={cn(
+          "flex items-center",
+          isDragging && "opacity-90 scale-[1.02] shadow-xl bg-card rounded-t-xl"
+        )} 
+        style={{ borderLeft: `4px solid ${section.color}` }}
+      >
         <div className="flex-1 flex items-center gap-3 px-3 py-2.5 bg-muted/30">
           <span className="text-sm font-semibold">{section.name}</span>
           <span className="text-xs text-muted-foreground">({sectionTasks.length})</span>
@@ -976,6 +987,7 @@ const Today = () => {
                 sections={sortedSections}
                 items={uncompletedItems}
                 onReorder={handleUnifiedReorder}
+                onSectionReorder={handleSectionReorder}
                 onTaskClick={handleSubtaskClick}
                 expandedTasks={expandedTasks}
                 renderSectionHeader={renderSectionHeader}
