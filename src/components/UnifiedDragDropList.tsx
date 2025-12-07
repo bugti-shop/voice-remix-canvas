@@ -16,7 +16,7 @@ interface UnifiedDragDropListProps {
   className?: string;
 }
 
-const LONG_PRESS_DELAY = 300;
+const LONG_PRESS_DELAY = 200;
 
 interface DragItem {
   id: string;
@@ -52,6 +52,7 @@ export const UnifiedDragDropList = ({
     startY: number;
     currentY: number;
     dropTarget: DropTarget | null;
+    draggedElementTop: number;
   }>({
     isDragging: false,
     draggedItem: null,
@@ -59,6 +60,7 @@ export const UnifiedDragDropList = ({
     startY: 0,
     currentY: 0,
     dropTarget: null,
+    draggedElementTop: 0,
   });
 
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -67,6 +69,7 @@ export const UnifiedDragDropList = ({
   const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const containerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLElement | null>(null);
 
   const clearLongPressTimer = useCallback(() => {
     if (longPressTimerRef.current) {
@@ -75,10 +78,53 @@ export const UnifiedDragDropList = ({
     }
   }, []);
 
+  // Find scrollable parent
+  useEffect(() => {
+    if (containerRef.current) {
+      let parent = containerRef.current.parentElement;
+      while (parent) {
+        const style = getComputedStyle(parent);
+        if (style.overflow === 'auto' || style.overflow === 'scroll' || 
+            style.overflowY === 'auto' || style.overflowY === 'scroll') {
+          scrollContainerRef.current = parent;
+          break;
+        }
+        parent = parent.parentElement;
+      }
+    }
+  }, []);
+
+  // Disable scrolling during drag
+  useEffect(() => {
+    if (dragState.isDragging) {
+      const scrollContainer = scrollContainerRef.current;
+      const originalBodyOverflow = document.body.style.overflow;
+      const originalHtmlOverflow = document.documentElement.style.overflow;
+      const originalScrollContainerOverflow = scrollContainer?.style.overflow;
+      
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      if (scrollContainer) {
+        scrollContainer.style.overflow = 'hidden';
+      }
+      
+      return () => {
+        document.body.style.overflow = originalBodyOverflow;
+        document.documentElement.style.overflow = originalHtmlOverflow;
+        if (scrollContainer) {
+          scrollContainer.style.overflow = originalScrollContainerOverflow || '';
+        }
+      };
+    }
+  }, [dragState.isDragging]);
+
   const handleTouchStart = useCallback((item: DragItem, e: React.TouchEvent) => {
     const touch = e.touches[0];
     touchStartRef.current = { x: touch.clientX, y: touch.clientY };
     hasMovedRef.current = false;
+
+    const element = itemRefs.current.get(item.id);
+    const elementTop = element?.getBoundingClientRect().top || touch.clientY;
 
     longPressTimerRef.current = setTimeout(async () => {
       if (!hasMovedRef.current) {
@@ -93,18 +139,18 @@ export const UnifiedDragDropList = ({
           startY: touch.clientY,
           currentY: touch.clientY,
           dropTarget: null,
+          draggedElementTop: elementTop,
         });
       }
     }, LONG_PRESS_DELAY);
   }, []);
 
-  const findDropTarget = useCallback((touchY: number, touchX: number): DropTarget | null => {
+  const findDropTarget = useCallback((draggedElementCurrentTop: number): DropTarget | null => {
     if (!dragState.draggedItem) return null;
 
     let closestTarget: DropTarget | null = null;
     let closestDistance = Infinity;
 
-    // Get all task items and their positions
     const taskPositions: { id: string; rect: DOMRect; sectionId?: string }[] = [];
     
     itemRefs.current.forEach((ref, id) => {
@@ -116,37 +162,30 @@ export const UnifiedDragDropList = ({
       }
     });
 
-    // Sort by vertical position
     taskPositions.sort((a, b) => a.rect.top - b.rect.top);
 
-    // Find the best drop position
     for (let i = 0; i < taskPositions.length; i++) {
       const { id, rect, sectionId } = taskPositions[i];
       const taskCenterY = rect.top + rect.height / 2;
       
-      // Check if dragging to make subtask (middle 40% of task)
       const subtaskZoneStart = rect.top + rect.height * 0.3;
       const subtaskZoneEnd = rect.top + rect.height * 0.7;
       
-      if (touchY >= subtaskZoneStart && touchY <= subtaskZoneEnd && dragState.draggedItem.type === 'task') {
-        // Make subtask - only if in the middle zone
-        const distance = Math.abs(touchY - taskCenterY);
+      if (draggedElementCurrentTop >= subtaskZoneStart && draggedElementCurrentTop <= subtaskZoneEnd && dragState.draggedItem.type === 'task') {
+        const distance = Math.abs(draggedElementCurrentTop - taskCenterY);
         if (distance < closestDistance) {
           closestDistance = distance;
           closestTarget = { type: 'subtask-area', taskId: id, sectionId };
         }
       } else {
-        // Regular reorder - before or after
-        if (touchY < taskCenterY) {
-          // Insert before this task
-          const distance = Math.abs(touchY - rect.top);
+        if (draggedElementCurrentTop < taskCenterY) {
+          const distance = Math.abs(draggedElementCurrentTop - rect.top);
           if (distance < closestDistance) {
             closestDistance = distance;
             closestTarget = { type: 'task', taskId: id, position: 'before', sectionId, insertIndex: i };
           }
         } else {
-          // Insert after this task
-          const distance = Math.abs(touchY - rect.bottom);
+          const distance = Math.abs(draggedElementCurrentTop - rect.bottom);
           if (distance < closestDistance) {
             closestDistance = distance;
             closestTarget = { type: 'task', taskId: id, position: 'after', sectionId, insertIndex: i + 1 };
@@ -155,11 +194,10 @@ export const UnifiedDragDropList = ({
       }
     }
 
-    // If no close target found, check sections for empty area drop
     if (!closestTarget || closestDistance > 60) {
       sectionRefs.current.forEach((ref, sectionId) => {
         const rect = ref.getBoundingClientRect();
-        if (touchY >= rect.top && touchY <= rect.bottom) {
+        if (draggedElementCurrentTop >= rect.top && draggedElementCurrentTop <= rect.bottom) {
           closestTarget = { type: 'section', sectionId };
         }
       });
@@ -173,7 +211,7 @@ export const UnifiedDragDropList = ({
     const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
     const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
 
-    if (!dragState.isDragging && (deltaX > 10 || deltaY > 10)) {
+    if (!dragState.isDragging && (deltaX > 8 || deltaY > 8)) {
       hasMovedRef.current = true;
       clearLongPressTimer();
       return;
@@ -184,9 +222,9 @@ export const UnifiedDragDropList = ({
       e.stopPropagation();
       
       const translateY = touch.clientY - dragState.startY;
-      const newDropTarget = findDropTarget(touch.clientY, touch.clientX);
+      const draggedElementCurrentTop = dragState.draggedElementTop + translateY;
+      const newDropTarget = findDropTarget(draggedElementCurrentTop);
       
-      // Haptic feedback when changing drop target
       if (JSON.stringify(newDropTarget) !== JSON.stringify(dragState.dropTarget)) {
         try {
           Haptics.impact({ style: ImpactStyle.Light });
@@ -216,14 +254,13 @@ export const UnifiedDragDropList = ({
       if (draggedItem.type === 'task') {
         const taskIndex = newItems.findIndex(i => i.id === draggedItem.id);
         if (taskIndex === -1) {
-          setDragState({ isDragging: false, draggedItem: null, translateY: 0, startY: 0, currentY: 0, dropTarget: null });
+          setDragState({ isDragging: false, draggedItem: null, translateY: 0, startY: 0, currentY: 0, dropTarget: null, draggedElementTop: 0 });
           return;
         }
         
         const [movedTask] = newItems.splice(taskIndex, 1);
 
         if (dropTarget.type === 'subtask-area' && dropTarget.taskId) {
-          // Convert task to subtask
           newItems = newItems.map(item => {
             if (item.id === dropTarget.taskId) {
               return {
@@ -234,26 +271,21 @@ export const UnifiedDragDropList = ({
             return item;
           });
         } else if (dropTarget.type === 'task' && dropTarget.taskId) {
-          // Find the target task's current index after removal
           let targetIndex = newItems.findIndex(i => i.id === dropTarget.taskId);
           
           if (targetIndex !== -1) {
-            // Calculate correct insert position
             const insertIndex = dropTarget.position === 'after' ? targetIndex + 1 : targetIndex;
             const targetTask = newItems[targetIndex];
             movedTask.sectionId = targetTask?.sectionId;
             newItems.splice(insertIndex, 0, movedTask);
           } else {
-            // Fallback: just add to end
             newItems.push(movedTask);
           }
         } else if (dropTarget.type === 'section' && dropTarget.sectionId) {
-          // Move task to section (at the end)
           movedTask.sectionId = dropTarget.sectionId;
           newItems.push(movedTask);
         }
       } else if (draggedItem.type === 'subtask' && draggedItem.parentId) {
-        // Find and remove subtask from parent
         let movedSubtask: TodoItem | null = null;
         newItems = newItems.map(item => {
           if (item.id === draggedItem.parentId && item.subtasks) {
@@ -271,7 +303,6 @@ export const UnifiedDragDropList = ({
 
         if (movedSubtask) {
           if (dropTarget.type === 'section' || (dropTarget.type === 'task' && dropTarget.taskId !== draggedItem.parentId)) {
-            // Convert subtask to task
             const newTask: TodoItem = {
               ...movedSubtask,
               sectionId: dropTarget.sectionId || sections[0]?.id,
@@ -287,7 +318,6 @@ export const UnifiedDragDropList = ({
               newItems.push(newTask);
             }
           } else if (dropTarget.type === 'subtask-area' && dropTarget.taskId && dropTarget.taskId !== draggedItem.parentId) {
-            // Move subtask to another task
             newItems = newItems.map(item => {
               if (item.id === dropTarget.taskId) {
                 return {
@@ -311,6 +341,7 @@ export const UnifiedDragDropList = ({
       startY: 0,
       currentY: 0,
       dropTarget: null,
+      draggedElementTop: 0,
     });
   }, [dragState, items, sections, onReorder, clearLongPressTimer]);
 
@@ -323,6 +354,7 @@ export const UnifiedDragDropList = ({
       startY: 0,
       currentY: 0,
       dropTarget: null,
+      draggedElementTop: 0,
     });
   }, [clearLongPressTimer]);
 
@@ -360,7 +392,6 @@ export const UnifiedDragDropList = ({
 
   const sortedSections = [...sections].sort((a, b) => a.order - b.order);
 
-  // Render drop indicator line
   const renderDropIndicator = (taskId: string, position: 'before' | 'after') => {
     const isActive = dragState.dropTarget?.type === 'task' && 
                     dragState.dropTarget?.taskId === taskId && 
@@ -376,7 +407,6 @@ export const UnifiedDragDropList = ({
           bottom: position === 'after' ? '-2px' : 'auto',
         }}
       >
-        {/* Circle indicator on left */}
         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-blue-500 rounded-full shadow-lg" />
       </div>
     );
@@ -406,7 +436,7 @@ export const UnifiedDragDropList = ({
             key={section.id}
             ref={(ref) => setSectionRef(section.id, ref)}
             className={cn(
-              "rounded-xl overflow-hidden border border-border/30 transition-all",
+              "rounded-xl overflow-hidden border border-border/30",
               isDropTargetSection && "ring-2 ring-blue-500 bg-blue-500/5"
             )}
           >
@@ -430,27 +460,22 @@ export const UnifiedDragDropList = ({
                           <div
                             ref={(ref) => setItemRef(item.id, ref)}
                             className={cn(
-                              "relative transition-transform",
-                              isDragging && "z-50 opacity-80 scale-[1.02] shadow-xl bg-card",
-                              isSubtaskDropTarget && "ring-2 ring-blue-500 ring-inset bg-blue-500/10"
+                              "relative",
+                              isDragging && "z-50 opacity-90 scale-[1.02] shadow-xl bg-card"
                             )}
                             style={{
                               transform: isDragging ? `translateY(${dragState.translateY}px)` : undefined,
-                              transition: isDragging ? 'none' : 'transform 0.2s ease-out',
                             }}
                             onTouchStart={(e) => handleTouchStart({ id: item.id, type: 'task', sectionId: item.sectionId }, e)}
                           >
-                            {/* Drop indicator - before */}
                             {renderDropIndicator(item.id, 'before')}
                             
                             {renderTask(item, isDragging, isSubtaskDropTarget, undefined)}
                             
-                            {/* Drop indicator - after */}
                             {renderDropIndicator(item.id, 'after')}
 
-                            {/* Subtask hint when hovering middle */}
                             {isSubtaskDropTarget && (
-                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30 ring-2 ring-blue-500 ring-inset bg-blue-500/10">
                                 <span className="text-xs font-medium text-blue-500 bg-blue-50 dark:bg-blue-950 px-2 py-1 rounded-full shadow-sm">
                                   Make subtask
                                 </span>
@@ -458,7 +483,6 @@ export const UnifiedDragDropList = ({
                             )}
                           </div>
 
-                          {/* Subtasks */}
                           {hasSubtasks && isExpanded && (
                             <div className="ml-8 border-l-2 border-muted/50 bg-muted/10">
                               {item.subtasks!.map((subtask) => {
@@ -469,23 +493,18 @@ export const UnifiedDragDropList = ({
                                     key={subtask.id}
                                     ref={(ref) => setItemRef(subtask.id, ref)}
                                     className={cn(
-                                      "relative transition-transform",
-                                      isSubtaskDragging && "z-50 opacity-80 scale-[1.02] shadow-xl bg-card"
+                                      "relative",
+                                      isSubtaskDragging && "z-50 opacity-90 scale-[1.02] shadow-xl bg-card"
                                     )}
                                     style={{
                                       transform: isSubtaskDragging ? `translateY(${dragState.translateY}px)` : undefined,
-                                      transition: isSubtaskDragging ? 'none' : 'transform 0.2s ease-out',
                                     }}
                                     onTouchStart={(e) => handleTouchStart({ id: subtask.id, type: 'subtask', parentId: item.id }, e)}
-                                    onClick={() => onTaskClick(subtask, item.id)}
                                   >
                                     {renderSubtask(subtask, item.id, isSubtaskDragging, false)}
                                   </div>
                                 );
                               })}
-                              <p className="text-xs text-muted-foreground px-3 py-1.5 bg-muted/20">
-                                {item.subtasks!.filter(st => st.completed).length}/{item.subtasks!.length} completed
-                              </p>
                             </div>
                           )}
                         </div>
@@ -503,3 +522,5 @@ export const UnifiedDragDropList = ({
     </div>
   );
 };
+
+export default UnifiedDragDropList;
