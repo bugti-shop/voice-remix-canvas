@@ -153,11 +153,16 @@ export const TaskItem = ({
           {/* Main task card */}
           <div
             className={cn(
-              "bg-card rounded-lg border group hover:shadow-sm transition-all p-2 cursor-pointer h-[72px] relative",
+              "bg-card rounded-lg border group hover:shadow-sm transition-all p-2 cursor-pointer h-[72px] relative select-none",
               isSelected && "ring-2 ring-primary",
               level > 0 && "mr-2"
             )}
-            style={{ transform: `translateX(${swipeX}px)`, transition: isSwiping ? 'none' : 'transform 0.3s ease-out' }}
+            style={{ 
+              transform: `translateX(${swipeX}px)`, 
+              transition: isSwiping ? 'none' : 'transform 0.3s ease-out',
+              WebkitUserSelect: 'none',
+              userSelect: 'none',
+            }}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}

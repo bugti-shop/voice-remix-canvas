@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { TodoItem, Folder, Priority, Note, TaskSection } from '@/types/note';
 import { WaveformVisualizer } from '@/components/WaveformVisualizer';
 import { Play, Pause, Repeat, Check, Trash2 as TrashIcon, Edit, Plus as PlusIcon, ArrowUpCircle, ArrowDownCircle, Move } from 'lucide-react';
@@ -17,6 +17,7 @@ import { PrioritySelectSheet } from '@/components/PrioritySelectSheet';
 import { BatchTaskSheet } from '@/components/BatchTaskSheet';
 import { SectionEditSheet } from '@/components/SectionEditSheet';
 import { SectionMoveSheet } from '@/components/SectionMoveSheet';
+import { DraggableTaskList } from '@/components/DraggableTaskList';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { notificationManager } from '@/utils/notifications';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -142,13 +143,15 @@ const Today = () => {
     setInputSectionId(null);
   };
 
-  const handleBatchAddTasks = (taskTexts: string[], sectionId?: string, folderId?: string) => {
+  const handleBatchAddTasks = (taskTexts: string[], sectionId?: string, folderId?: string, priority?: Priority, dueDate?: Date) => {
     const newItems: TodoItem[] = taskTexts.map((text, idx) => ({
       id: `${Date.now()}-${idx}`,
       text,
       completed: false,
       folderId: folderId || selectedFolderId || undefined,
       sectionId: sectionId || inputSectionId || sections[0]?.id,
+      priority: priority,
+      dueDate: dueDate,
     }));
     setItems([...newItems, ...items]);
     toast.success(`Added ${newItems.length} task(s)`);
@@ -267,6 +270,19 @@ const Today = () => {
     try { await Haptics.impact({ style: ImpactStyle.Medium }); } catch {}
     setItems(items.filter((item) => item.id !== itemId));
   };
+
+  // Reorder tasks within a section
+  const handleReorderTasks = useCallback((sectionId: string, reorderedTasks: TodoItem[]) => {
+    setItems(prevItems => {
+      // Get all items not in this section
+      const otherItems = prevItems.filter(item => {
+        const itemSectionId = item.sectionId || sections[0]?.id;
+        return itemSectionId !== sectionId || item.completed;
+      });
+      // Combine with reordered tasks
+      return [...reorderedTasks, ...otherItems];
+    });
+  }, [sections]);
 
   const duplicateTask = async (task: TodoItem) => {
     try { await Haptics.impact({ style: ImpactStyle.Light }); } catch {}
@@ -818,9 +834,15 @@ const Today = () => {
         {!section.isCollapsed && (
           <div className="bg-background" style={{ borderLeft: `4px solid ${section.color}` }}>
             {sectionTasks.length > 0 ? (
-              <div className="space-y-0">
-                {sectionTasks.map(renderTaskItem)}
-              </div>
+              <DraggableTaskList
+                items={sectionTasks}
+                onReorder={(reordered) => handleReorderTasks(section.id, reordered)}
+                renderItem={(item, isDragging, isDropTarget) => (
+                  <div className={cn(isDragging && "bg-card rounded-lg")}>
+                    {renderTaskItem(item)}
+                  </div>
+                )}
+              />
             ) : (
               <div className="py-4 px-4 text-center text-sm text-muted-foreground">
                 No tasks in this section
