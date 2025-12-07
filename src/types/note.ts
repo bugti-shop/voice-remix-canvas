@@ -30,6 +30,7 @@ export interface TodoItem {
   sectionId?: string;
   imageUrl?: string;
   description?: string;
+  location?: string;
   subtasks?: TodoItem[];
   categoryId?: string;
   googleCalendarEventId?: string;
