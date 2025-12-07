@@ -1,25 +1,25 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Progress } from '@/components/ui/progress';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Slider } from '@/components/ui/slider';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   X, Play, Pause, RotateCcw, Settings, Coffee, 
-  Brain, Target, Volume2, VolumeX, SkipForward 
+  Brain, Target, Volume2, VolumeX, SkipForward,
+  LinkIcon, CheckCircle2, Clock, ChevronDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { toast } from 'sonner';
+import { TodoItem } from '@/types/note';
 
 type SessionType = 'work' | 'shortBreak' | 'longBreak';
 
 interface PomodoroSettings {
-  workDuration: number;      // minutes
-  shortBreakDuration: number; // minutes
-  longBreakDuration: number;  // minutes
+  workDuration: number;
+  shortBreakDuration: number;
+  longBreakDuration: number;
   sessionsUntilLongBreak: number;
   autoStartBreaks: boolean;
   autoStartWork: boolean;
@@ -33,6 +33,16 @@ interface PomodoroSession {
   endTime: Date;
   duration: number;
   completed: boolean;
+  linkedTaskId?: string;
+  linkedTaskText?: string;
+}
+
+interface TaskTimeTracking {
+  taskId: string;
+  taskText: string;
+  totalMinutes: number;
+  sessionsCount: number;
+  lastSession: Date;
 }
 
 interface PomodoroTimerProps {
@@ -74,6 +84,14 @@ export const PomodoroTimer = ({ isOpen, onClose }: PomodoroTimerProps) => {
   const [isRunning, setIsRunning] = useState(false);
   const [completedSessions, setCompletedSessions] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
+  const [showTaskPicker, setShowTaskPicker] = useState(false);
+  const [linkedTask, setLinkedTask] = useState<{ id: string; text: string } | null>(null);
+  const [availableTasks, setAvailableTasks] = useState<TodoItem[]>([]);
+  const [taskTimeTracking, setTaskTimeTracking] = useState<TaskTimeTracking[]>(() => {
+    const saved = localStorage.getItem('pomodoroTaskTracking');
+    return saved ? JSON.parse(saved) : [];
+  });
+  
   const [todaySessions, setTodaySessions] = useState<PomodoroSession[]>(() => {
     const saved = localStorage.getItem('pomodoroSessions');
     if (saved) {
@@ -89,6 +107,20 @@ export const PomodoroTimer = ({ isOpen, onClose }: PomodoroTimerProps) => {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const sessionStartRef = useRef<Date | null>(null);
 
+  // Load available tasks
+  useEffect(() => {
+    const loadTasks = () => {
+      const savedTasks = localStorage.getItem('todoItems');
+      if (savedTasks) {
+        const tasks: TodoItem[] = JSON.parse(savedTasks);
+        setAvailableTasks(tasks.filter(t => !t.completed));
+      }
+    };
+    loadTasks();
+    window.addEventListener('storage', loadTasks);
+    return () => window.removeEventListener('storage', loadTasks);
+  }, []);
+
   // Save settings
   useEffect(() => {
     localStorage.setItem('pomodoroSettings', JSON.stringify(settings));
@@ -98,6 +130,11 @@ export const PomodoroTimer = ({ isOpen, onClose }: PomodoroTimerProps) => {
   useEffect(() => {
     localStorage.setItem('pomodoroSessions', JSON.stringify(todaySessions));
   }, [todaySessions]);
+
+  // Save task time tracking
+  useEffect(() => {
+    localStorage.setItem('pomodoroTaskTracking', JSON.stringify(taskTimeTracking));
+  }, [taskTimeTracking]);
 
   // Timer logic
   useEffect(() => {
@@ -124,6 +161,32 @@ export const PomodoroTimer = ({ isOpen, onClose }: PomodoroTimerProps) => {
     };
   }, [isRunning]);
 
+  const updateTaskTimeTracking = (taskId: string, taskText: string, duration: number) => {
+    setTaskTimeTracking(prev => {
+      const existing = prev.find(t => t.taskId === taskId);
+      if (existing) {
+        return prev.map(t => 
+          t.taskId === taskId 
+            ? { 
+                ...t, 
+                totalMinutes: t.totalMinutes + duration,
+                sessionsCount: t.sessionsCount + 1,
+                lastSession: new Date()
+              }
+            : t
+        );
+      } else {
+        return [...prev, {
+          taskId,
+          taskText,
+          totalMinutes: duration,
+          sessionsCount: 1,
+          lastSession: new Date()
+        }];
+      }
+    });
+  };
+
   const handleSessionComplete = async () => {
     setIsRunning(false);
     
@@ -148,8 +211,15 @@ export const PomodoroTimer = ({ isOpen, onClose }: PomodoroTimerProps) => {
         endTime: new Date(),
         duration: getDuration(sessionType),
         completed: true,
+        linkedTaskId: linkedTask?.id,
+        linkedTaskText: linkedTask?.text,
       };
       setTodaySessions(prev => [...prev, session]);
+
+      // Update task time tracking if linked
+      if (linkedTask && sessionType === 'work') {
+        updateTaskTimeTracking(linkedTask.id, linkedTask.text, getDuration(sessionType));
+      }
     }
 
     // Handle next session
@@ -217,12 +287,34 @@ export const PomodoroTimer = ({ isOpen, onClose }: PomodoroTimerProps) => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const formatDuration = (minutes: number) => {
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  };
+
+  const handleLinkTask = (task: TodoItem) => {
+    setLinkedTask({ id: task.id, text: task.text });
+    setShowTaskPicker(false);
+    toast.success(`Linked to: ${task.text}`);
+  };
+
+  const handleUnlinkTask = () => {
+    setLinkedTask(null);
+    toast.info('Task unlinked');
+  };
+
   const progress = ((getDuration(sessionType) * 60 - timeRemaining) / (getDuration(sessionType) * 60)) * 100;
 
   const todayWorkSessions = todaySessions.filter(s => s.type === 'work' && s.completed).length;
   const todayTotalMinutes = todaySessions
     .filter(s => s.type === 'work' && s.completed)
     .reduce((acc, s) => acc + s.duration, 0);
+
+  const linkedTaskSessions = linkedTask 
+    ? todaySessions.filter(s => s.linkedTaskId === linkedTask.id && s.completed).length
+    : 0;
 
   if (!isOpen) return null;
 
@@ -338,6 +430,40 @@ export const PomodoroTimer = ({ isOpen, onClose }: PomodoroTimerProps) => {
               </div>
             </div>
 
+            {/* Task Time Tracking Stats */}
+            {taskTimeTracking.length > 0 && (
+              <div className="pt-4 border-t">
+                <h4 className="font-medium text-sm mb-3 flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Time Tracked by Task
+                </h4>
+                <ScrollArea className="h-48">
+                  <div className="space-y-2">
+                    {taskTimeTracking
+                      .sort((a, b) => b.totalMinutes - a.totalMinutes)
+                      .map((tracking) => (
+                        <div 
+                          key={tracking.taskId}
+                          className="p-3 bg-muted/50 rounded-lg"
+                        >
+                          <p className="text-sm font-medium line-clamp-1">{tracking.taskText}</p>
+                          <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {formatDuration(tracking.totalMinutes)}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Brain className="h-3 w-3" />
+                              {tracking.sessionsCount} sessions
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
+
             <Button 
               variant="outline" 
               className="w-full"
@@ -348,6 +474,40 @@ export const PomodoroTimer = ({ isOpen, onClose }: PomodoroTimerProps) => {
           </div>
         ) : (
           <div className="p-4 flex flex-col items-center">
+            {/* Task Link Button */}
+            <div className="w-full max-w-sm mb-4">
+              {linkedTask ? (
+                <div className="flex items-center gap-2 p-3 bg-primary/10 rounded-lg border border-primary/20">
+                  <LinkIcon className="h-4 w-4 text-primary flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground">Tracking time for:</p>
+                    <p className="text-sm font-medium truncate">{linkedTask.text}</p>
+                    {linkedTaskSessions > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {linkedTaskSessions} session{linkedTaskSessions !== 1 ? 's' : ''} today
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleUnlinkTask}
+                    className="text-xs h-7"
+                  >
+                    Unlink
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowTaskPicker(true)}
+                  className="w-full flex items-center justify-center gap-2 p-3 border border-dashed border-muted-foreground/30 rounded-lg text-muted-foreground hover:bg-muted/50 transition-colors"
+                >
+                  <LinkIcon className="h-4 w-4" />
+                  <span className="text-sm">Link to a task for time tracking</span>
+                </button>
+              )}
+            </div>
+
             {/* Session Type Tabs */}
             <div className="flex gap-2 mb-8">
               {(['work', 'shortBreak', 'longBreak'] as SessionType[]).map((type) => (
@@ -462,9 +622,90 @@ export const PomodoroTimer = ({ isOpen, onClose }: PomodoroTimerProps) => {
                 />
               ))}
             </div>
+
+            {/* Today's Sessions with Task Links */}
+            {todaySessions.filter(s => s.type === 'work' && s.completed).length > 0 && (
+              <div className="w-full max-w-sm mt-6">
+                <h4 className="font-medium text-sm mb-3 flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Today's Work Sessions
+                </h4>
+                <ScrollArea className="h-32">
+                  <div className="space-y-2">
+                    {todaySessions
+                      .filter(s => s.type === 'work' && s.completed)
+                      .reverse()
+                      .map((session, idx) => (
+                        <div 
+                          key={idx}
+                          className="flex items-center justify-between p-2 bg-muted/30 rounded-lg text-xs"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Brain className="h-3 w-3 text-red-500" />
+                            <span>{session.duration} min</span>
+                            {session.linkedTaskText && (
+                              <span className="text-muted-foreground truncate max-w-[120px]">
+                                • {session.linkedTaskText}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-muted-foreground">
+                            {new Date(session.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {/* Task Picker Modal */}
+      {showTaskPicker && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center p-4">
+          <div className="bg-background rounded-xl w-full max-w-md max-h-[70vh] flex flex-col animate-in slide-in-from-bottom duration-200">
+            <div className="flex items-center justify-between p-4 border-b border-border">
+              <h3 className="font-semibold">Link to Task</h3>
+              <button 
+                onClick={() => setShowTaskPicker(false)}
+                className="p-1 hover:bg-muted rounded-lg"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <ScrollArea className="flex-1 p-4">
+              {availableTasks.length > 0 ? (
+                <div className="space-y-2">
+                  {availableTasks.map((task) => {
+                    const tracking = taskTimeTracking.find(t => t.taskId === task.id);
+                    return (
+                      <button
+                        key={task.id}
+                        onClick={() => handleLinkTask(task)}
+                        className="w-full text-left p-3 rounded-lg hover:bg-muted/50 border border-border transition-colors"
+                      >
+                        <p className="text-sm font-medium line-clamp-1">{task.text}</p>
+                        {tracking && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatDuration(tracking.totalMinutes)} tracked • {tracking.sessionsCount} sessions
+                          </p>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>No tasks available</p>
+                  <p className="text-xs mt-1">Create tasks in the Todo section first</p>
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
