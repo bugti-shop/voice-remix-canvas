@@ -3,21 +3,34 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ListPlus, FolderIcon, LayoutList } from 'lucide-react';
-import { TaskSection, Folder } from '@/types/note';
+import { ListPlus, FolderIcon, LayoutList, Flag, Calendar } from 'lucide-react';
+import { TaskSection, Folder, Priority } from '@/types/note';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 interface BatchTaskSheetProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddTasks: (tasks: string[], sectionId?: string, folderId?: string) => void;
+  onAddTasks: (tasks: string[], sectionId?: string, folderId?: string, priority?: Priority, dueDate?: Date) => void;
   sections?: TaskSection[];
   folders?: Folder[];
 }
+
+const priorityOptions: { value: Priority; label: string; color: string }[] = [
+  { value: 'high', label: 'High', color: 'text-red-500' },
+  { value: 'medium', label: 'Medium', color: 'text-orange-500' },
+  { value: 'low', label: 'Low', color: 'text-green-500' },
+  { value: 'none', label: 'None', color: 'text-muted-foreground' },
+];
 
 export const BatchTaskSheet = ({ isOpen, onClose, onAddTasks, sections = [], folders = [] }: BatchTaskSheetProps) => {
   const [text, setText] = useState('');
   const [selectedSection, setSelectedSection] = useState<string>('');
   const [selectedFolder, setSelectedFolder] = useState<string>('');
+  const [selectedPriority, setSelectedPriority] = useState<Priority>('none');
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
 
   const handleAdd = () => {
     const tasks = text
@@ -26,15 +39,24 @@ export const BatchTaskSheet = ({ isOpen, onClose, onAddTasks, sections = [], fol
       .filter(line => line.length > 0);
     
     if (tasks.length > 0) {
-      onAddTasks(tasks, selectedSection || undefined, selectedFolder || undefined);
+      onAddTasks(
+        tasks, 
+        selectedSection || undefined, 
+        selectedFolder || undefined,
+        selectedPriority !== 'none' ? selectedPriority : undefined,
+        selectedDate
+      );
       setText('');
       setSelectedSection('');
       setSelectedFolder('');
+      setSelectedPriority('none');
+      setSelectedDate(undefined);
       onClose();
     }
   };
 
   const taskCount = text.split('\n').filter(line => line.trim().length > 0).length;
+  const selectedPriorityOption = priorityOptions.find(p => p.value === selectedPriority);
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
@@ -113,6 +135,72 @@ export const BatchTaskSheet = ({ isOpen, onClose, onAddTasks, sections = [], fol
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          {/* Priority and Due Date Selection */}
+          <div className="flex gap-3">
+            <div className="flex-1 space-y-1.5">
+              <label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Flag className="h-3.5 w-3.5" />
+                Priority
+              </label>
+              <Select value={selectedPriority} onValueChange={(v) => setSelectedPriority(v as Priority)}>
+                <SelectTrigger className="h-9">
+                  <SelectValue>
+                    <span className={cn(selectedPriorityOption?.color)}>
+                      {selectedPriorityOption?.label || 'None'}
+                    </span>
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {priorityOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      <span className={cn(option.color)}>{option.label}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex-1 space-y-1.5">
+              <label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5" />
+                Due Date
+              </label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "h-9 w-full justify-start text-left font-normal",
+                      !selectedDate && "text-muted-foreground"
+                    )}
+                  >
+                    {selectedDate ? format(selectedDate, 'MMM d, yyyy') : 'No date'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={setSelectedDate}
+                    initialFocus
+                  />
+                  {selectedDate && (
+                    <div className="p-2 border-t">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="w-full"
+                        onClick={() => setSelectedDate(undefined)}
+                      >
+                        Clear date
+                      </Button>
+                    </div>
+                  )}
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
           
