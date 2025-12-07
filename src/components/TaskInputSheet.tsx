@@ -22,7 +22,9 @@ import {
   Tag,
   CalendarClock,
   Settings2,
-  ListTodo
+  ListTodo,
+  FileText,
+  MapPin
 } from 'lucide-react';
 import { EditActionsSheet, ActionItem, defaultActions } from './EditActionsSheet';
 import { WaveformVisualizer } from './WaveformVisualizer';
@@ -80,6 +82,10 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
   const [editTagColor, setEditTagColor] = useState('');
   const [deadline, setDeadline] = useState<Date | undefined>();
   const [deadlineReminderTime, setDeadlineReminderTime] = useState<Date | undefined>();
+  const [description, setDescription] = useState('');
+  const [location, setLocation] = useState('');
+  const [showDescriptionInput, setShowDescriptionInput] = useState(false);
+  const [showLocationInput, setShowLocationInput] = useState(false);
   const [showEditActions, setShowEditActions] = useState(false);
   const [actionItems, setActionItems] = useState<ActionItem[]>(() => {
     const saved = localStorage.getItem('taskInputActions');
@@ -134,6 +140,10 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
       setShowTagInput(false);
       setDeadline(undefined);
       setDeadlineReminderTime(undefined);
+      setDescription('');
+      setLocation('');
+      setShowDescriptionInput(false);
+      setShowLocationInput(false);
       setVoiceRecording(undefined);
       setIsRecording(false);
       setRecordingTime(0);
@@ -183,6 +193,8 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
       imageUrl,
       coloredTags: coloredTags.length > 0 ? coloredTags : undefined,
       voiceRecording,
+      description: description.trim() || undefined,
+      location: location.trim() || undefined,
     };
 
     // If deadline is set, store it in dueDate
@@ -598,12 +610,12 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
           )}
 
           {/* Date/Time/Repeat indicator */}
-          {(dueDate || reminderTime || repeatSettings) && (
+          {(dueDate || repeatSettings) && (
             <div className="px-4 py-2 bg-blue-50 dark:bg-blue-950/20 rounded-lg flex items-center gap-2 mb-4">
               <CalendarCheck className="h-4 w-4 text-blue-500" />
               <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">
                 {dueDate ? format(dueDate, 'MMM d') : ''}
-                {reminderTime ? ` • ${format(reminderTime, 'h:mm a')}` : ''}
+                {dueDate && (dueDate.getHours() !== 0 || dueDate.getMinutes() !== 0) ? ` • ${format(dueDate, 'h:mm a')}` : ''}
                 {repeatSettings ? ` • Repeats ${repeatSettings.frequency}` : ''}
               </span>
               <button
@@ -661,6 +673,42 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
                   </button>
                 </span>
               ))}
+            </div>
+          )}
+
+          {/* Description indicator */}
+          {description && (
+            <div className="px-4 py-2 bg-cyan-50 dark:bg-cyan-950/20 rounded-lg flex items-center gap-2 mb-4">
+              <FileText className="h-4 w-4 text-cyan-500" />
+              <span className="text-sm text-cyan-700 dark:text-cyan-300 font-medium truncate flex-1">
+                {description.length > 50 ? description.substring(0, 50) + '...' : description}
+              </span>
+              <button
+                onClick={() => {
+                  setDescription('');
+                }}
+                className="ml-auto"
+              >
+                <X className="h-4 w-4 text-cyan-500 hover:text-cyan-700" />
+              </button>
+            </div>
+          )}
+
+          {/* Location indicator */}
+          {location && (
+            <div className="px-4 py-2 bg-pink-50 dark:bg-pink-950/20 rounded-lg flex items-center gap-2 mb-4">
+              <MapPin className="h-4 w-4 text-pink-500" />
+              <span className="text-sm text-pink-700 dark:text-pink-300 font-medium truncate flex-1">
+                {location}
+              </span>
+              <button
+                onClick={() => {
+                  setLocation('');
+                }}
+                className="ml-auto"
+              >
+                <X className="h-4 w-4 text-pink-500 hover:text-pink-700" />
+              </button>
             </div>
           )}
 
@@ -943,6 +991,76 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
                       {imageUrl ? 'Image Added' : 'Image'}
                     </span>
                   </button>
+                );
+              }
+
+              if (action.id === 'description') {
+                return (
+                  <Popover key={action.id} open={showDescriptionInput} onOpenChange={setShowDescriptionInput}>
+                    <PopoverTrigger asChild>
+                      <button
+                        className={cn(
+                          "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all whitespace-nowrap",
+                          description ? "border-cyan-500 bg-cyan-50 dark:bg-cyan-950/30" : "border-border bg-card hover:bg-muted"
+                        )}
+                      >
+                        {description && <span className="absolute -top-1 -right-1 w-2 h-2 bg-cyan-500 rounded-full" />}
+                        <FileText className={cn("h-4 w-4 flex-shrink-0", description ? "text-cyan-500" : "text-muted-foreground")} />
+                        <span className={cn("text-sm whitespace-nowrap", description ? "text-cyan-600 dark:text-cyan-400" : "text-muted-foreground")}>
+                          {description ? 'Has Description' : 'Description'}
+                        </span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-72 p-3 bg-popover z-50" align="start">
+                      <div className="space-y-3">
+                        <p className="text-sm font-medium">Task Description</p>
+                        <textarea
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                          placeholder="Add more details about this task..."
+                          className="w-full h-24 px-3 py-2 text-sm rounded-md border border-border bg-background resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                        />
+                        <Button size="sm" className="w-full" onClick={() => setShowDescriptionInput(false)}>
+                          Done
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                );
+              }
+
+              if (action.id === 'location') {
+                return (
+                  <Popover key={action.id} open={showLocationInput} onOpenChange={setShowLocationInput}>
+                    <PopoverTrigger asChild>
+                      <button
+                        className={cn(
+                          "relative flex items-center gap-1.5 px-3 py-2 rounded-md border transition-all whitespace-nowrap",
+                          location ? "border-pink-500 bg-pink-50 dark:bg-pink-950/30" : "border-border bg-card hover:bg-muted"
+                        )}
+                      >
+                        {location && <span className="absolute -top-1 -right-1 w-2 h-2 bg-pink-500 rounded-full" />}
+                        <MapPin className={cn("h-4 w-4 flex-shrink-0", location ? "text-pink-500" : "text-muted-foreground")} />
+                        <span className={cn("text-sm whitespace-nowrap", location ? "text-pink-600 dark:text-pink-400" : "text-muted-foreground")}>
+                          {location ? 'Has Location' : 'Location'}
+                        </span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-72 p-3 bg-popover z-50" align="start">
+                      <div className="space-y-3">
+                        <p className="text-sm font-medium">Task Location</p>
+                        <Input
+                          value={location}
+                          onChange={(e) => setLocation(e.target.value)}
+                          placeholder="Enter location..."
+                          className="h-9 text-sm"
+                        />
+                        <Button size="sm" className="w-full" onClick={() => setShowLocationInput(false)}>
+                          Done
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 );
               }
 
