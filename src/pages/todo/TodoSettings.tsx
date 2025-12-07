@@ -1,4 +1,4 @@
-import { ChevronRight, Settings as SettingsIcon, Cloud, CloudUpload, Calendar, Mail, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ChevronRight, Settings as SettingsIcon, Cloud, CloudUpload, Calendar, Mail, CheckCircle2, AlertCircle, Grid3X3, Timer, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { syncManager } from '@/utils/syncManager';
@@ -13,6 +13,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { TodoLayout } from './TodoLayout';
+import { EisenhowerMatrix } from '@/components/EisenhowerMatrix';
+import { PomodoroTimer } from '@/components/PomodoroTimer';
+import { CountdownTimer } from '@/components/CountdownTimer';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +40,9 @@ const TodoSettings = () => {
   const [showTermsDialog, setShowTermsDialog] = useState(false);
   const [showPrivacyDialog, setShowPrivacyDialog] = useState(false);
   const [showHelpDialog, setShowHelpDialog] = useState(false);
+  const [showEisenhower, setShowEisenhower] = useState(false);
+  const [showPomodoro, setShowPomodoro] = useState(false);
+  const [showCountdown, setShowCountdown] = useState(false);
   const [syncEnabled, setSyncEnabled] = useState(syncManager.isSyncEnabled());
   const { isOnline, isSyncing, manualSync, lastSync } = useRealtimeSync();
   const [calendarSyncEnabled, setCalendarSyncEnabled] = useState(calendarSyncManager.isCalendarSyncEnabled());
@@ -321,6 +327,60 @@ const TodoSettings = () => {
     <TodoLayout title="Settings">
       <main className="container mx-auto px-4 py-6 pb-24">
         <div className="max-w-2xl mx-auto space-y-6">
+          {/* Productivity Tools Section */}
+          <div className="bg-card border rounded-lg">
+            <div className="p-4 border-b">
+              <div className="flex items-center gap-2">
+                <Timer className="h-5 w-5 text-primary" />
+                <h2 className="font-semibold">Productivity Tools</h2>
+              </div>
+            </div>
+
+            <div className="divide-y divide-border">
+              <button
+                onClick={() => setShowEisenhower(true)}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors"
+              >
+                <div className="p-2 bg-red-100 dark:bg-red-950 rounded-lg">
+                  <Grid3X3 className="h-5 w-5 text-red-500" />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="font-medium text-sm">Eisenhower Matrix</p>
+                  <p className="text-xs text-muted-foreground">Prioritize by urgency & importance</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+
+              <button
+                onClick={() => setShowPomodoro(true)}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors"
+              >
+                <div className="p-2 bg-orange-100 dark:bg-orange-950 rounded-lg">
+                  <Timer className="h-5 w-5 text-orange-500" />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="font-medium text-sm">Pomodoro Timer</p>
+                  <p className="text-xs text-muted-foreground">Focus in 25-minute sessions</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+
+              <button
+                onClick={() => setShowCountdown(true)}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors"
+              >
+                <div className="p-2 bg-blue-100 dark:bg-blue-950 rounded-lg">
+                  <Clock className="h-5 w-5 text-blue-500" />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="font-medium text-sm">Countdown Timer</p>
+                  <p className="text-xs text-muted-foreground">Track important deadlines</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </div>
+          </div>
+
           {/* Cloud Sync Section */}
           <div className="bg-card border rounded-lg">
             <div className="p-4 border-b">
@@ -675,6 +735,11 @@ const TodoSettings = () => {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+
+      {/* Productivity Tools */}
+      <EisenhowerMatrix isOpen={showEisenhower} onClose={() => setShowEisenhower(false)} />
+      <PomodoroTimer isOpen={showPomodoro} onClose={() => setShowPomodoro(false)} />
+      <CountdownTimer isOpen={showCountdown} onClose={() => setShowCountdown(false)} />
     </TodoLayout>
   );
 };
