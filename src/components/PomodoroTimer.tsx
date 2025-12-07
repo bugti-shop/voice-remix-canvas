@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   X, Play, Pause, RotateCcw, Settings, Coffee, 
   Brain, Target, Volume2, VolumeX, SkipForward,
-  LinkIcon, CheckCircle2, Clock, ChevronDown
+  LinkIcon, CheckCircle2, Clock, ChevronDown, Goal, Trash2, Edit2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
@@ -43,6 +43,7 @@ interface TaskTimeTracking {
   totalMinutes: number;
   sessionsCount: number;
   lastSession: Date;
+  goalMinutes?: number;
 }
 
 interface PomodoroTimerProps {
@@ -91,6 +92,9 @@ export const PomodoroTimer = ({ isOpen, onClose }: PomodoroTimerProps) => {
     const saved = localStorage.getItem('pomodoroTaskTracking');
     return saved ? JSON.parse(saved) : [];
   });
+  const [showGoalSetter, setShowGoalSetter] = useState(false);
+  const [selectedTaskForGoal, setSelectedTaskForGoal] = useState<string | null>(null);
+  const [goalInputMinutes, setGoalInputMinutes] = useState<number>(60);
   
   const [todaySessions, setTodaySessions] = useState<PomodoroSession[]>(() => {
     const saved = localStorage.getItem('pomodoroSessions');
@@ -305,6 +309,33 @@ export const PomodoroTimer = ({ isOpen, onClose }: PomodoroTimerProps) => {
     toast.info('Task unlinked');
   };
 
+  const handleSetGoal = (taskId: string, goalMinutes: number) => {
+    setTaskTimeTracking(prev => prev.map(t =>
+      t.taskId === taskId ? { ...t, goalMinutes } : t
+    ));
+    setShowGoalSetter(false);
+    setSelectedTaskForGoal(null);
+    toast.success(`Goal set: ${formatDuration(goalMinutes)}`);
+  };
+
+  const handleRemoveGoal = (taskId: string) => {
+    setTaskTimeTracking(prev => prev.map(t =>
+      t.taskId === taskId ? { ...t, goalMinutes: undefined } : t
+    ));
+    toast.info('Goal removed');
+  };
+
+  const openGoalSetter = (taskId: string, currentGoal?: number) => {
+    setSelectedTaskForGoal(taskId);
+    setGoalInputMinutes(currentGoal || 60);
+    setShowGoalSetter(true);
+  };
+
+  const getGoalProgress = (tracking: TaskTimeTracking) => {
+    if (!tracking.goalMinutes) return 0;
+    return Math.min((tracking.totalMinutes / tracking.goalMinutes) * 100, 100);
+  };
+
   const progress = ((getDuration(sessionType) * 60 - timeRemaining) / (getDuration(sessionType) * 60)) * 100;
 
   const todayWorkSessions = todaySessions.filter(s => s.type === 'work' && s.completed).length;
@@ -430,35 +461,98 @@ export const PomodoroTimer = ({ isOpen, onClose }: PomodoroTimerProps) => {
               </div>
             </div>
 
-            {/* Task Time Tracking Stats */}
+            {/* Task Time Tracking Stats with Goals */}
             {taskTimeTracking.length > 0 && (
               <div className="pt-4 border-t">
                 <h4 className="font-medium text-sm mb-3 flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  Time Tracked by Task
+                  <Goal className="h-4 w-4" />
+                  Task Time Goals & Progress
                 </h4>
-                <ScrollArea className="h-48">
-                  <div className="space-y-2">
+                <ScrollArea className="h-64">
+                  <div className="space-y-3">
                     {taskTimeTracking
                       .sort((a, b) => b.totalMinutes - a.totalMinutes)
-                      .map((tracking) => (
-                        <div 
-                          key={tracking.taskId}
-                          className="p-3 bg-muted/50 rounded-lg"
-                        >
-                          <p className="text-sm font-medium line-clamp-1">{tracking.taskText}</p>
-                          <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {formatDuration(tracking.totalMinutes)}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Brain className="h-3 w-3" />
-                              {tracking.sessionsCount} sessions
-                            </span>
+                      .map((tracking) => {
+                        const progress = getGoalProgress(tracking);
+                        const isGoalComplete = tracking.goalMinutes && tracking.totalMinutes >= tracking.goalMinutes;
+                        
+                        return (
+                          <div 
+                            key={tracking.taskId}
+                            className={cn(
+                              "p-3 rounded-lg border",
+                              isGoalComplete 
+                                ? "bg-green-500/10 border-green-500/30" 
+                                : "bg-muted/50 border-border/50"
+                            )}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-sm font-medium line-clamp-1 flex-1">{tracking.taskText}</p>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => openGoalSetter(tracking.taskId, tracking.goalMinutes)}
+                                  className="p-1 hover:bg-muted rounded"
+                                >
+                                  <Edit2 className="h-3 w-3 text-muted-foreground" />
+                                </button>
+                                {tracking.goalMinutes && (
+                                  <button
+                                    onClick={() => handleRemoveGoal(tracking.taskId)}
+                                    className="p-1 hover:bg-muted rounded"
+                                  >
+                                    <Trash2 className="h-3 w-3 text-muted-foreground" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {formatDuration(tracking.totalMinutes)}
+                                {tracking.goalMinutes && (
+                                  <span> / {formatDuration(tracking.goalMinutes)}</span>
+                                )}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Brain className="h-3 w-3" />
+                                {tracking.sessionsCount} sessions
+                              </span>
+                            </div>
+                            
+                            {tracking.goalMinutes && (
+                              <div className="mt-2">
+                                <div className="flex items-center justify-between text-xs mb-1">
+                                  <span className={cn(
+                                    isGoalComplete ? "text-green-600 font-medium" : "text-muted-foreground"
+                                  )}>
+                                    {isGoalComplete ? "Goal Complete! 🎉" : `${Math.round(progress)}% complete`}
+                                  </span>
+                                </div>
+                                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                  <div 
+                                    className={cn(
+                                      "h-full rounded-full transition-all duration-500",
+                                      isGoalComplete ? "bg-green-500" : "bg-primary"
+                                    )}
+                                    style={{ width: `${progress}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                            
+                            {!tracking.goalMinutes && (
+                              <button
+                                onClick={() => openGoalSetter(tracking.taskId)}
+                                className="mt-2 text-xs text-primary hover:underline flex items-center gap-1"
+                              >
+                                <Goal className="h-3 w-3" />
+                                Set time goal
+                              </button>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                   </div>
                 </ScrollArea>
               </div>
@@ -688,9 +782,22 @@ export const PomodoroTimer = ({ isOpen, onClose }: PomodoroTimerProps) => {
                       >
                         <p className="text-sm font-medium line-clamp-1">{task.text}</p>
                         {tracking && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {formatDuration(tracking.totalMinutes)} tracked • {tracking.sessionsCount} sessions
-                          </p>
+                          <div className="mt-1">
+                            <p className="text-xs text-muted-foreground">
+                              {formatDuration(tracking.totalMinutes)} tracked • {tracking.sessionsCount} sessions
+                            </p>
+                            {tracking.goalMinutes && (
+                              <div className="mt-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                                <div 
+                                  className={cn(
+                                    "h-full rounded-full",
+                                    tracking.totalMinutes >= tracking.goalMinutes ? "bg-green-500" : "bg-primary"
+                                  )}
+                                  style={{ width: `${getGoalProgress(tracking)}%` }}
+                                />
+                              </div>
+                            )}
+                          </div>
                         )}
                       </button>
                     );
@@ -703,6 +810,77 @@ export const PomodoroTimer = ({ isOpen, onClose }: PomodoroTimerProps) => {
                 </div>
               )}
             </ScrollArea>
+          </div>
+        </div>
+      )}
+
+      {/* Goal Setter Modal */}
+      {showGoalSetter && selectedTaskForGoal && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+          <div className="bg-background rounded-xl w-full max-w-sm p-4 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Goal className="h-4 w-4" />
+                Set Time Goal
+              </h3>
+              <button 
+                onClick={() => {
+                  setShowGoalSetter(false);
+                  setSelectedTaskForGoal(null);
+                }}
+                className="p-1 hover:bg-muted rounded-lg"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+              {taskTimeTracking.find(t => t.taskId === selectedTaskForGoal)?.taskText}
+            </p>
+            
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm">Goal Duration</Label>
+                <div className="flex items-center gap-3 mt-2">
+                  <Slider
+                    value={[goalInputMinutes]}
+                    onValueChange={([v]) => setGoalInputMinutes(v)}
+                    min={15}
+                    max={480}
+                    step={15}
+                    className="flex-1"
+                  />
+                  <span className="text-sm font-medium w-16 text-right">
+                    {formatDuration(goalInputMinutes)}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="flex gap-2 flex-wrap">
+                {[30, 60, 120, 180, 240, 480].map((mins) => (
+                  <button
+                    key={mins}
+                    onClick={() => setGoalInputMinutes(mins)}
+                    className={cn(
+                      "px-3 py-1 rounded-lg text-xs font-medium transition-colors",
+                      goalInputMinutes === mins 
+                        ? "bg-primary text-primary-foreground" 
+                        : "bg-muted hover:bg-muted/80"
+                    )}
+                  >
+                    {formatDuration(mins)}
+                  </button>
+                ))}
+              </div>
+              
+              <Button 
+                onClick={() => handleSetGoal(selectedTaskForGoal, goalInputMinutes)}
+                className="w-full"
+              >
+                <Target className="h-4 w-4 mr-2" />
+                Set Goal
+              </Button>
+            </div>
           </div>
         </div>
       )}
