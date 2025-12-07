@@ -329,12 +329,31 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
     reminder?: string;
     repeatSettings?: RepeatSettings;
   }) => {
-    setDueDate(data.selectedDate);
+    // Combine date with time
+    let finalDate: Date | undefined;
+    if (data.selectedDate) {
+      finalDate = new Date(data.selectedDate);
+      if (data.selectedTime) {
+        let hour = data.selectedTime.hour;
+        // Convert 12-hour to 24-hour format
+        if (data.selectedTime.period === 'PM' && hour !== 12) {
+          hour += 12;
+        } else if (data.selectedTime.period === 'AM' && hour === 12) {
+          hour = 0;
+        }
+        finalDate.setHours(hour, data.selectedTime.minute, 0, 0);
+      }
+    }
+    
+    setDueDate(finalDate);
     
     // Set reminder time based on reminder option
-    if (data.reminder && data.reminder !== 'none' && data.selectedDate) {
-      const reminderDate = new Date(data.selectedDate);
+    if (data.reminder && data.reminder !== 'none' && finalDate) {
+      const reminderDate = new Date(finalDate);
       switch (data.reminder) {
+        case 'instant':
+          // Reminder at the exact task time
+          break;
         case '5min':
           reminderDate.setMinutes(reminderDate.getMinutes() - 5);
           break;
