@@ -866,21 +866,17 @@ const Today = () => {
                     <DropdownMenuItem onClick={() => setIsBatchTaskOpen(true)} className="cursor-pointer">
                       <ListPlus className="h-4 w-4 mr-2" />Add Multiple Tasks
                     </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => handleAddSection('below')} className="cursor-pointer">
+                      <PlusIcon className="h-4 w-4 mr-2" />Sections
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setIsFolderManageOpen(true)} className="cursor-pointer">
+                      <FolderIcon className="h-4 w-4 mr-2" />Folders
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => { setIsSelectionMode(true); setIsSelectActionsOpen(true); }} className="cursor-pointer">
                       <MousePointer2 className="h-4 w-4 mr-2" />Select
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => handleAddSection('below')} className="cursor-pointer">
-                      <PlusIcon className="h-4 w-4 mr-2" />Add Section
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setIsFolderManageOpen(true)} className="cursor-pointer">
-                      <FolderPlus className="h-4 w-4 mr-2" />Create Folder
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setIsFolderManageOpen(true)} className="cursor-pointer">
-                      <Settings className="h-4 w-4 mr-2" />Manage Folders
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => setViewMode(viewMode === 'card' ? 'flat' : 'card')} className="cursor-pointer">
                       {viewMode === 'card' ? <LayoutList className="h-4 w-4 mr-2" /> : <LayoutGrid className="h-4 w-4 mr-2" />}
                       {viewMode === 'card' ? 'Flat Layout' : 'Card Layout'}
