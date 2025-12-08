@@ -1051,6 +1051,7 @@ const Today = () => {
                 onTaskClick={handleSubtaskClick}
                 expandedTasks={expandedTasks}
                 renderSectionHeader={renderSectionHeader}
+                selectedFolderId={selectedFolderId}
                 renderEmptySection={(section) => (
                   <div className="py-4 px-4 text-center text-sm text-muted-foreground">
                     No tasks in this section
