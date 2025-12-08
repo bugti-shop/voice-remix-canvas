@@ -1067,21 +1067,23 @@ const Today = () => {
                   
                   return (
                     <div className="relative overflow-hidden">
-                      {/* Swipe action backgrounds */}
-                      <div className="absolute inset-0 flex">
-                        <div className={cn(
-                          "flex-1 flex items-center justify-start pl-4 transition-colors",
-                          currentSubtaskSwipe && currentSubtaskSwipe.x > SWIPE_THRESHOLD ? "bg-green-500" : "bg-green-500/70"
-                        )}>
-                          <Check className="h-4 w-4 text-white" />
+                      {/* Swipe action backgrounds - only show when actively swiping */}
+                      {currentSubtaskSwipe && currentSubtaskSwipe.isSwiping && (
+                        <div className="absolute inset-0 flex">
+                          <div className={cn(
+                            "flex-1 flex items-center justify-start pl-4 transition-colors",
+                            currentSubtaskSwipe.x > SWIPE_THRESHOLD ? "bg-green-500" : "bg-green-500/70"
+                          )}>
+                            <Check className="h-4 w-4 text-white" />
+                          </div>
+                          <div className={cn(
+                            "flex-1 flex items-center justify-end pr-4 transition-colors",
+                            currentSubtaskSwipe.x < -SWIPE_THRESHOLD ? "bg-red-500" : "bg-red-500/70"
+                          )}>
+                            <TrashIcon className="h-4 w-4 text-white" />
+                          </div>
                         </div>
-                        <div className={cn(
-                          "flex-1 flex items-center justify-end pr-4 transition-colors",
-                          currentSubtaskSwipe && currentSubtaskSwipe.x < -SWIPE_THRESHOLD ? "bg-red-500" : "bg-red-500/70"
-                        )}>
-                          <TrashIcon className="h-4 w-4 text-white" />
-                        </div>
-                      </div>
+                      )}
                       
                       {/* Subtask content */}
                       <div 
