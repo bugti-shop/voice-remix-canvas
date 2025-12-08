@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, Trash2, Calendar, MoreVertical, Target, Zap, Brain, Sparkles, Timer, Focus } from 'lucide-react';
+import { ArrowLeft, Check, Trash2, Calendar, MoreVertical, Target, Zap, Brain, Sparkles, Timer, Focus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { TodoItem } from '@/types/note';
+import { TodoItem, Folder } from '@/types/note';
 import { TodoLayout } from './TodoLayout';
 import { TaskDateTimePage } from '@/components/TaskDateTimePage';
+import { TaskInputSheet } from '@/components/TaskInputSheet';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,6 +59,9 @@ const CustomToolDetail = () => {
   const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [taskToReschedule, setTaskToReschedule] = useState<TodoItem | null>(null);
+  const [showTaskInput, setShowTaskInput] = useState(false);
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [quickTaskText, setQuickTaskText] = useState('');
 
   useEffect(() => {
     // Load custom tool
@@ -76,6 +81,12 @@ const CustomToolDetail = () => {
         reminderTime: t.reminderTime ? new Date(t.reminderTime) : undefined,
       }));
       setAllTasks(tasks);
+    }
+
+    // Load folders
+    const savedFolders = localStorage.getItem('todoFolders');
+    if (savedFolders) {
+      setFolders(JSON.parse(savedFolders));
     }
   }, [toolId]);
 
@@ -179,6 +190,95 @@ const CustomToolDetail = () => {
     toast.success('Task unlinked from tool');
   };
 
+  const handleAddTask = (taskData: Omit<TodoItem, 'id' | 'completed'>) => {
+    if (!tool) return;
+    
+    const newTask: TodoItem = {
+      ...taskData,
+      id: Date.now().toString(),
+      completed: false,
+    };
+    
+    // Add to all tasks
+    const updatedTasks = [...allTasks, newTask];
+    setAllTasks(updatedTasks);
+    localStorage.setItem('todoItems', JSON.stringify(updatedTasks));
+    window.dispatchEvent(new Event('todoItemsUpdated'));
+    
+    // Link task to this tool
+    const updatedTools = JSON.parse(localStorage.getItem('customProductivityTools') || '[]');
+    const updated = updatedTools.map((t: CustomTool) => {
+      if (t.id === tool.id) {
+        return {
+          ...t,
+          linkedTaskIds: [...(t.linkedTaskIds || []), newTask.id]
+        };
+      }
+      return t;
+    });
+    localStorage.setItem('customProductivityTools', JSON.stringify(updated));
+    
+    // Update local tool state
+    setTool(prev => prev ? {
+      ...prev,
+      linkedTaskIds: [...(prev.linkedTaskIds || []), newTask.id]
+    } : null);
+    
+    setShowTaskInput(false);
+    toast.success('Task added and linked to tool');
+  };
+
+  const handleQuickAddTask = () => {
+    if (!quickTaskText.trim() || !tool) return;
+    
+    const newTask: TodoItem = {
+      id: Date.now().toString(),
+      text: quickTaskText.trim(),
+      completed: false,
+    };
+    
+    // Add to all tasks
+    const updatedTasks = [...allTasks, newTask];
+    setAllTasks(updatedTasks);
+    localStorage.setItem('todoItems', JSON.stringify(updatedTasks));
+    window.dispatchEvent(new Event('todoItemsUpdated'));
+    
+    // Link task to this tool
+    const updatedTools = JSON.parse(localStorage.getItem('customProductivityTools') || '[]');
+    const updated = updatedTools.map((t: CustomTool) => {
+      if (t.id === tool.id) {
+        return {
+          ...t,
+          linkedTaskIds: [...(t.linkedTaskIds || []), newTask.id]
+        };
+      }
+      return t;
+    });
+    localStorage.setItem('customProductivityTools', JSON.stringify(updated));
+    
+    // Update local tool state
+    setTool(prev => prev ? {
+      ...prev,
+      linkedTaskIds: [...(prev.linkedTaskIds || []), newTask.id]
+    } : null);
+    
+    setQuickTaskText('');
+    toast.success('Task added');
+  };
+
+  const handleCreateFolder = (name: string, color: string) => {
+    const newFolder: Folder = {
+      id: Date.now().toString(),
+      name,
+      color,
+      isDefault: false,
+      createdAt: new Date(),
+    };
+    const updatedFolders = [...folders, newFolder];
+    setFolders(updatedFolders);
+    localStorage.setItem('todoFolders', JSON.stringify(updatedFolders));
+  };
+
   const IconComponent = tool ? TOOL_ICONS[tool.icon] || Target : Target;
 
   if (!tool) {
@@ -235,6 +335,37 @@ const CustomToolDetail = () => {
           </div>
         </div>
 
+        {/* Quick Add Task */}
+        <div className="px-4 pb-4">
+          <div className="flex gap-2">
+            <Input
+              placeholder="Quick add task..."
+              value={quickTaskText}
+              onChange={(e) => setQuickTaskText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleQuickAddTask();
+                }
+              }}
+              className="flex-1"
+            />
+            <Button 
+              size="icon" 
+              onClick={handleQuickAddTask}
+              disabled={!quickTaskText.trim()}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setShowTaskInput(true)}
+            >
+              More Options
+            </Button>
+          </div>
+        </div>
+
         {/* Tasks List */}
         <ScrollArea className="flex-1 px-4 pb-24">
           {linkedTasks.length === 0 ? (
@@ -242,15 +373,8 @@ const CustomToolDetail = () => {
               <IconComponent className="h-12 w-12 text-muted-foreground/30 mb-4" />
               <p className="text-muted-foreground">No tasks linked to this tool yet.</p>
               <p className="text-sm text-muted-foreground/70 mt-1">
-                Edit this tool in Settings to link tasks.
+                Add a task above or use "More Options" for detailed settings.
               </p>
-              <Button 
-                variant="outline" 
-                className="mt-4"
-                onClick={() => navigate('/todo/settings')}
-              >
-                Go to Settings
-              </Button>
             </div>
           ) : (
             <div className="space-y-4">
@@ -418,6 +542,16 @@ const CustomToolDetail = () => {
             hideRepeat={false}
           />
         )}
+
+        {/* Task Input Sheet */}
+        <TaskInputSheet
+          isOpen={showTaskInput}
+          onClose={() => setShowTaskInput(false)}
+          onAddTask={handleAddTask}
+          folders={folders}
+          selectedFolderId={null}
+          onCreateFolder={handleCreateFolder}
+        />
       </div>
     </TodoLayout>
   );
