@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { TodoItem, TaskSection } from '@/types/note';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { cn } from '@/lib/utils';
@@ -17,7 +17,7 @@ interface UnifiedDragDropListProps {
   className?: string;
 }
 
-const LONG_PRESS_DELAY = 200;
+const LONG_PRESS_DELAY = 150; // Reduced for faster response
 
 interface DragItem {
   id: string;
@@ -32,6 +32,7 @@ interface DropTarget {
   taskId?: string;
   position?: 'before' | 'after';
   insertIndex?: number;
+  indicatorY?: number; // Track indicator position
 }
 
 export const UnifiedDragDropList = ({
@@ -47,23 +48,20 @@ export const UnifiedDragDropList = ({
   expandedTasks,
   className
 }: UnifiedDragDropListProps) => {
-  const [dragState, setDragState] = useState<{
-    isDragging: boolean;
-    draggedItem: DragItem | null;
-    translateY: number;
-    startY: number;
-    currentY: number;
-    dropTarget: DropTarget | null;
-    draggedElementTop: number;
-  }>({
+  // Use refs for frequently updated values to avoid re-renders
+  const dragStateRef = useRef({
     isDragging: false,
-    draggedItem: null,
+    draggedItem: null as DragItem | null,
     translateY: 0,
     startY: 0,
     currentY: 0,
-    dropTarget: null,
+    dropTarget: null as DropTarget | null,
     draggedElementTop: 0,
   });
+  
+  const [renderTrigger, setRenderTrigger] = useState(0);
+  const animationFrameRef = useRef<number | null>(null);
+  const lastHapticRef = useRef<string | null>(null);
 
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const touchStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -72,6 +70,13 @@ export const UnifiedDragDropList = ({
   const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLElement | null>(null);
+  const indicatorRef = useRef<HTMLDivElement>(null);
+
+  // Memoize sorted sections
+  const sortedSections = useMemo(() => 
+    [...sections].sort((a, b) => a.order - b.order),
+    [sections]
+  );
 
   const clearLongPressTimer = useCallback(() => {
     if (longPressTimerRef.current) {
@@ -98,7 +103,7 @@ export const UnifiedDragDropList = ({
 
   // Disable scrolling during drag
   useEffect(() => {
-    if (dragState.isDragging) {
+    if (dragStateRef.current.isDragging) {
       const scrollContainer = scrollContainerRef.current;
       const originalBodyOverflow = document.body.style.overflow;
       const originalHtmlOverflow = document.documentElement.style.overflow;
@@ -118,7 +123,7 @@ export const UnifiedDragDropList = ({
         }
       };
     }
-  }, [dragState.isDragging]);
+  }, [renderTrigger]);
 
   const handleTouchStart = useCallback((item: DragItem, e: React.TouchEvent) => {
     const touch = e.touches[0];
@@ -134,7 +139,7 @@ export const UnifiedDragDropList = ({
           await Haptics.impact({ style: ImpactStyle.Medium });
         } catch {}
 
-        setDragState({
+        dragStateRef.current = {
           isDragging: true,
           draggedItem: item,
           translateY: 0,
@@ -142,13 +147,15 @@ export const UnifiedDragDropList = ({
           currentY: touch.clientY,
           dropTarget: null,
           draggedElementTop: elementTop,
-        });
+        };
+        setRenderTrigger(prev => prev + 1);
       }
     }, LONG_PRESS_DELAY);
   }, []);
 
   const findDropTarget = useCallback((draggedElementCurrentTop: number): DropTarget | null => {
-    if (!dragState.draggedItem) return null;
+    const draggedItem = dragStateRef.current.draggedItem;
+    if (!draggedItem) return null;
 
     let closestTarget: DropTarget | null = null;
     let closestDistance = Infinity;
@@ -156,15 +163,13 @@ export const UnifiedDragDropList = ({
     const taskPositions: { id: string; rect: DOMRect; sectionId?: string }[] = [];
     
     itemRefs.current.forEach((ref, id) => {
-      if (id === dragState.draggedItem?.id) return;
+      if (id === draggedItem.id) return;
       
       const item = items.find(i => i.id === id);
       if (item && !item.completed) {
         taskPositions.push({ id, rect: ref.getBoundingClientRect(), sectionId: item.sectionId });
       }
     });
-
-    taskPositions.sort((a, b) => a.rect.top - b.rect.top);
 
     for (let i = 0; i < taskPositions.length; i++) {
       const { id, rect, sectionId } = taskPositions[i];
@@ -173,24 +178,24 @@ export const UnifiedDragDropList = ({
       const subtaskZoneStart = rect.top + rect.height * 0.3;
       const subtaskZoneEnd = rect.top + rect.height * 0.7;
       
-      if (draggedElementCurrentTop >= subtaskZoneStart && draggedElementCurrentTop <= subtaskZoneEnd && dragState.draggedItem.type === 'task') {
+      if (draggedElementCurrentTop >= subtaskZoneStart && draggedElementCurrentTop <= subtaskZoneEnd && draggedItem.type === 'task') {
         const distance = Math.abs(draggedElementCurrentTop - taskCenterY);
         if (distance < closestDistance) {
           closestDistance = distance;
-          closestTarget = { type: 'subtask-area', taskId: id, sectionId };
+          closestTarget = { type: 'subtask-area', taskId: id, sectionId, indicatorY: taskCenterY };
         }
       } else {
         if (draggedElementCurrentTop < taskCenterY) {
           const distance = Math.abs(draggedElementCurrentTop - rect.top);
           if (distance < closestDistance) {
             closestDistance = distance;
-            closestTarget = { type: 'task', taskId: id, position: 'before', sectionId, insertIndex: i };
+            closestTarget = { type: 'task', taskId: id, position: 'before', sectionId, insertIndex: i, indicatorY: rect.top };
           }
         } else {
           const distance = Math.abs(draggedElementCurrentTop - rect.bottom);
           if (distance < closestDistance) {
             closestDistance = distance;
-            closestTarget = { type: 'task', taskId: id, position: 'after', sectionId, insertIndex: i + 1 };
+            closestTarget = { type: 'task', taskId: id, position: 'after', sectionId, insertIndex: i + 1, indicatorY: rect.bottom };
           }
         }
       }
@@ -200,54 +205,91 @@ export const UnifiedDragDropList = ({
       sectionRefs.current.forEach((ref, sectionId) => {
         const rect = ref.getBoundingClientRect();
         if (draggedElementCurrentTop >= rect.top && draggedElementCurrentTop <= rect.bottom) {
-          closestTarget = { type: 'section', sectionId };
+          closestTarget = { type: 'section', sectionId, indicatorY: rect.top + rect.height / 2 };
         }
       });
     }
 
     return closestTarget;
-  }, [dragState.draggedItem, items]);
+  }, [items]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     const touch = e.touches[0];
     const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
     const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
 
-    if (!dragState.isDragging && (deltaX > 8 || deltaY > 8)) {
+    if (!dragStateRef.current.isDragging && (deltaX > 8 || deltaY > 8)) {
       hasMovedRef.current = true;
       clearLongPressTimer();
       return;
     }
 
-    if (dragState.isDragging) {
+    if (dragStateRef.current.isDragging) {
       e.preventDefault();
       e.stopPropagation();
       
-      const translateY = touch.clientY - dragState.startY;
-      const draggedElementCurrentTop = dragState.draggedElementTop + translateY;
-      const newDropTarget = findDropTarget(draggedElementCurrentTop);
-      
-      if (JSON.stringify(newDropTarget) !== JSON.stringify(dragState.dropTarget)) {
-        try {
-          Haptics.impact({ style: ImpactStyle.Light });
-        } catch {}
+      // Cancel any pending animation frame
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
       }
-
-      setDragState(prev => ({
-        ...prev,
-        translateY,
-        currentY: touch.clientY,
-        dropTarget: newDropTarget,
-      }));
+      
+      // Use requestAnimationFrame for smooth updates
+      animationFrameRef.current = requestAnimationFrame(() => {
+        const translateY = touch.clientY - dragStateRef.current.startY;
+        const draggedElementCurrentTop = dragStateRef.current.draggedElementTop + translateY;
+        const newDropTarget = findDropTarget(draggedElementCurrentTop);
+        
+        // Update ref immediately for instant visual feedback
+        dragStateRef.current.translateY = translateY;
+        dragStateRef.current.currentY = touch.clientY;
+        
+        // Directly update dragged element transform for instant response
+        const draggedItem = dragStateRef.current.draggedItem;
+        if (draggedItem) {
+          const element = itemRefs.current.get(draggedItem.id);
+          if (element) {
+            element.style.transform = `translateY(${translateY}px)`;
+          }
+        }
+        
+        // Update indicator position directly
+        if (indicatorRef.current && newDropTarget?.indicatorY !== undefined) {
+          const containerRect = containerRef.current?.getBoundingClientRect();
+          if (containerRect) {
+            indicatorRef.current.style.top = `${newDropTarget.indicatorY - containerRect.top}px`;
+            indicatorRef.current.style.opacity = newDropTarget.type === 'subtask-area' ? '0' : '1';
+          }
+        } else if (indicatorRef.current) {
+          indicatorRef.current.style.opacity = '0';
+        }
+        
+        // Haptic feedback on target change (debounced)
+        const targetKey = newDropTarget ? `${newDropTarget.type}-${newDropTarget.taskId}-${newDropTarget.position}` : null;
+        if (targetKey !== lastHapticRef.current) {
+          lastHapticRef.current = targetKey;
+          if (newDropTarget) {
+            try { Haptics.impact({ style: ImpactStyle.Light }); } catch {}
+          }
+        }
+        
+        dragStateRef.current.dropTarget = newDropTarget;
+        
+        // Only trigger re-render for drop target changes (for highlighting)
+        setRenderTrigger(prev => prev + 1);
+      });
     }
-  }, [dragState, findDropTarget, clearLongPressTimer]);
+  }, [findDropTarget, clearLongPressTimer]);
 
   const handleTouchEnd = useCallback(() => {
     clearLongPressTimer();
+    
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
 
-    if (dragState.isDragging && dragState.draggedItem && dragState.dropTarget) {
-      const { draggedItem, dropTarget } = dragState;
+    const { isDragging, draggedItem, dropTarget } = dragStateRef.current;
 
+    if (isDragging && draggedItem && dropTarget) {
       try {
         Haptics.impact({ style: ImpactStyle.Heavy });
       } catch {}
@@ -257,7 +299,7 @@ export const UnifiedDragDropList = ({
       if (draggedItem.type === 'task') {
         const taskIndex = newItems.findIndex(i => i.id === draggedItem.id);
         if (taskIndex === -1) {
-          setDragState({ isDragging: false, draggedItem: null, translateY: 0, startY: 0, currentY: 0, dropTarget: null, draggedElementTop: 0 });
+          resetDragState();
           return;
         }
         
@@ -337,7 +379,25 @@ export const UnifiedDragDropList = ({
       onReorder(newItems);
     }
 
-    setDragState({
+    resetDragState();
+  }, [items, sections, onReorder, clearLongPressTimer]);
+
+  const resetDragState = useCallback(() => {
+    // Reset element transform
+    const draggedItem = dragStateRef.current.draggedItem;
+    if (draggedItem) {
+      const element = itemRefs.current.get(draggedItem.id);
+      if (element) {
+        element.style.transform = '';
+      }
+    }
+    
+    // Hide indicator
+    if (indicatorRef.current) {
+      indicatorRef.current.style.opacity = '0';
+    }
+    
+    dragStateRef.current = {
       isDragging: false,
       draggedItem: null,
       translateY: 0,
@@ -345,28 +405,25 @@ export const UnifiedDragDropList = ({
       currentY: 0,
       dropTarget: null,
       draggedElementTop: 0,
-    });
-  }, [dragState, items, sections, onReorder, onSectionReorder, clearLongPressTimer]);
+    };
+    lastHapticRef.current = null;
+    setRenderTrigger(prev => prev + 1);
+  }, []);
 
   const handleTouchCancel = useCallback(() => {
     clearLongPressTimer();
-    setDragState({
-      isDragging: false,
-      draggedItem: null,
-      translateY: 0,
-      startY: 0,
-      currentY: 0,
-      dropTarget: null,
-      draggedElementTop: 0,
-    });
-  }, [clearLongPressTimer]);
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+    resetDragState();
+  }, [clearLongPressTimer, resetDragState]);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     const preventContextMenu = (e: Event) => {
-      if (dragState.isDragging) {
+      if (dragStateRef.current.isDragging) {
         e.preventDefault();
       }
     };
@@ -374,8 +431,11 @@ export const UnifiedDragDropList = ({
     container.addEventListener('contextmenu', preventContextMenu);
     return () => {
       container.removeEventListener('contextmenu', preventContextMenu);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
     };
-  }, [dragState.isDragging]);
+  }, []);
 
   const setItemRef = useCallback((id: string, ref: HTMLDivElement | null) => {
     if (ref) {
@@ -393,27 +453,8 @@ export const UnifiedDragDropList = ({
     }
   }, []);
 
-  const sortedSections = [...sections].sort((a, b) => a.order - b.order);
-
-  const renderDropIndicator = (taskId: string, position: 'before' | 'after') => {
-    const isActive = dragState.dropTarget?.type === 'task' && 
-                    dragState.dropTarget?.taskId === taskId && 
-                    dragState.dropTarget?.position === position;
-    
-    if (!isActive) return null;
-
-    return (
-      <div 
-        className="absolute left-0 right-0 h-1 bg-blue-500 rounded-full z-40 shadow-[0_0_8px_2px_rgba(59,130,246,0.5)]"
-        style={{ 
-          top: position === 'before' ? '-2px' : 'auto',
-          bottom: position === 'after' ? '-2px' : 'auto',
-        }}
-      >
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-blue-500 rounded-full shadow-lg" />
-      </div>
-    );
-  };
+  // Get current drag state for rendering
+  const dragState = dragStateRef.current;
 
   return (
     <div 
@@ -428,6 +469,18 @@ export const UnifiedDragDropList = ({
         WebkitUserSelect: 'none',
       }}
     >
+      {/* Global drop indicator - follows dragged item */}
+      <div 
+        ref={indicatorRef}
+        className="absolute left-4 right-4 h-1 bg-blue-500 rounded-full z-[60] pointer-events-none shadow-[0_0_12px_3px_rgba(59,130,246,0.6)]"
+        style={{ 
+          opacity: 0,
+          transition: 'top 0.05s linear',
+        }}
+      >
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-blue-500 rounded-full shadow-lg" />
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-blue-500 rounded-full shadow-lg" />
+      </div>
       {sortedSections.map(section => {
         const sectionTasks = items.filter(item => 
           !item.completed && (item.sectionId === section.id || (!item.sectionId && section.id === sections[0]?.id))
@@ -463,22 +516,15 @@ export const UnifiedDragDropList = ({
                           <div
                             ref={(ref) => setItemRef(item.id, ref)}
                             className={cn(
-                              "relative",
-                              isDragging && "z-50 opacity-90 scale-[1.02] shadow-xl bg-card"
+                              "relative will-change-transform",
+                              isDragging && "z-50 opacity-95 scale-[1.02] shadow-2xl bg-card rounded-lg"
                             )}
-                            style={{
-                              transform: isDragging ? `translateY(${dragState.translateY}px)` : undefined,
-                            }}
                             onTouchStart={(e) => handleTouchStart({ id: item.id, type: 'task', sectionId: item.sectionId }, e)}
                           >
-                            {renderDropIndicator(item.id, 'before')}
-                            
                             {renderTask(item, isDragging, isSubtaskDropTarget, undefined)}
-                            
-                            {renderDropIndicator(item.id, 'after')}
 
                             {isSubtaskDropTarget && (
-                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30 ring-2 ring-blue-500 ring-inset bg-blue-500/10">
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30 ring-2 ring-blue-500 ring-inset bg-blue-500/10 rounded-lg">
                                 <span className="text-xs font-medium text-blue-500 bg-blue-50 dark:bg-blue-950 px-2 py-1 rounded-full shadow-sm">
                                   Make subtask
                                 </span>
@@ -496,12 +542,9 @@ export const UnifiedDragDropList = ({
                                     key={subtask.id}
                                     ref={(ref) => setItemRef(subtask.id, ref)}
                                     className={cn(
-                                      "relative",
-                                      isSubtaskDragging && "z-50 opacity-90 scale-[1.02] shadow-xl bg-card"
+                                      "relative will-change-transform",
+                                      isSubtaskDragging && "z-50 opacity-95 scale-[1.02] shadow-2xl bg-card rounded-lg"
                                     )}
-                                    style={{
-                                      transform: isSubtaskDragging ? `translateY(${dragState.translateY}px)` : undefined,
-                                    }}
                                     onTouchStart={(e) => handleTouchStart({ id: subtask.id, type: 'subtask', parentId: item.id }, e)}
                                   >
                                     {renderSubtask(subtask, item.id, isSubtaskDragging, false)}
