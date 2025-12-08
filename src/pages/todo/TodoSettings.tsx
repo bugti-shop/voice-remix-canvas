@@ -1,4 +1,4 @@
-import { ChevronRight, Settings as SettingsIcon, Cloud, CloudUpload, Calendar, Mail, CheckCircle2, AlertCircle, Grid3X3, Timer, Clock } from 'lucide-react';
+import { ChevronRight, Settings as SettingsIcon, Cloud, CloudUpload, Calendar, Mail, CheckCircle2, AlertCircle, Grid3X3, Timer, Clock, BarChart3, Focus, CalendarDays, CalendarRange } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { syncManager } from '@/utils/syncManager';
@@ -16,6 +16,10 @@ import { TodoLayout } from './TodoLayout';
 import { EisenhowerMatrix } from '@/components/EisenhowerMatrix';
 import { PomodoroTimer } from '@/components/PomodoroTimer';
 import { CountdownTimer } from '@/components/CountdownTimer';
+import { TaskAnalytics } from '@/components/TaskAnalytics';
+import { FocusMode } from '@/components/FocusMode';
+import { DailyPlanner } from '@/components/DailyPlanner';
+import { WeeklyReview } from '@/components/WeeklyReview';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,6 +47,10 @@ const TodoSettings = () => {
   const [showEisenhower, setShowEisenhower] = useState(false);
   const [showPomodoro, setShowPomodoro] = useState(false);
   const [showCountdown, setShowCountdown] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showFocusMode, setShowFocusMode] = useState(false);
+  const [showDailyPlanner, setShowDailyPlanner] = useState(false);
+  const [showWeeklyReview, setShowWeeklyReview] = useState(false);
   const [syncEnabled, setSyncEnabled] = useState(syncManager.isSyncEnabled());
   const { isOnline, isSyncing, manualSync, lastSync } = useRealtimeSync();
   const [calendarSyncEnabled, setCalendarSyncEnabled] = useState(calendarSyncManager.isCalendarSyncEnabled());
@@ -360,7 +368,7 @@ const TodoSettings = () => {
                 </div>
                 <div className="flex-1 text-left">
                   <p className="font-medium text-sm">Pomodoro Timer</p>
-                  <p className="text-xs text-muted-foreground">Focus in 25-minute sessions</p>
+                  <p className="text-xs text-muted-foreground">Focus sessions with time goals</p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </button>
@@ -375,6 +383,62 @@ const TodoSettings = () => {
                 <div className="flex-1 text-left">
                   <p className="font-medium text-sm">Countdown Timer</p>
                   <p className="text-xs text-muted-foreground">Track important deadlines</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+
+              <button
+                onClick={() => setShowFocusMode(true)}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors"
+              >
+                <div className="p-2 bg-purple-100 dark:bg-purple-950 rounded-lg">
+                  <Focus className="h-5 w-5 text-purple-500" />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="font-medium text-sm">Focus Mode</p>
+                  <p className="text-xs text-muted-foreground">One task at a time</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+
+              <button
+                onClick={() => setShowDailyPlanner(true)}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors"
+              >
+                <div className="p-2 bg-green-100 dark:bg-green-950 rounded-lg">
+                  <CalendarDays className="h-5 w-5 text-green-500" />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="font-medium text-sm">Daily Planner</p>
+                  <p className="text-xs text-muted-foreground">Plan by time blocks</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+
+              <button
+                onClick={() => setShowWeeklyReview(true)}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors"
+              >
+                <div className="p-2 bg-indigo-100 dark:bg-indigo-950 rounded-lg">
+                  <CalendarRange className="h-5 w-5 text-indigo-500" />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="font-medium text-sm">Weekly Review</p>
+                  <p className="text-xs text-muted-foreground">Reflect on your progress</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+
+              <button
+                onClick={() => setShowAnalytics(true)}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors"
+              >
+                <div className="p-2 bg-cyan-100 dark:bg-cyan-950 rounded-lg">
+                  <BarChart3 className="h-5 w-5 text-cyan-500" />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="font-medium text-sm">Task Analytics</p>
+                  <p className="text-xs text-muted-foreground">Track productivity & streaks</p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </button>
@@ -740,6 +804,10 @@ const TodoSettings = () => {
       <EisenhowerMatrix isOpen={showEisenhower} onClose={() => setShowEisenhower(false)} />
       <PomodoroTimer isOpen={showPomodoro} onClose={() => setShowPomodoro(false)} />
       <CountdownTimer isOpen={showCountdown} onClose={() => setShowCountdown(false)} />
+      <TaskAnalytics isOpen={showAnalytics} onClose={() => setShowAnalytics(false)} />
+      <FocusMode isOpen={showFocusMode} onClose={() => setShowFocusMode(false)} />
+      <DailyPlanner isOpen={showDailyPlanner} onClose={() => setShowDailyPlanner(false)} />
+      <WeeklyReview isOpen={showWeeklyReview} onClose={() => setShowWeeklyReview(false)} />
     </TodoLayout>
   );
 };
