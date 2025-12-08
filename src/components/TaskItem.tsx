@@ -277,8 +277,14 @@ export const TaskItem = ({
                     )}
                   </div>
                 )}
-                {/* Subtasks indicator - hidden when hideDetails is true */}
-                {!hideDetails && hasSubtasks && !isOpen && <p className="text-xs text-muted-foreground mt-1">{item.subtasks!.filter(st => st.completed).length}/{item.subtasks!.length} subtasks</p>}
+                {/* Date display - hidden when hideDetails is true */}
+                {!hideDetails && item.dueDate && !item.voiceRecording && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {new Date(item.dueDate).toLocaleDateString()}
+                  </p>
+                )}
+                {/* Subtasks indicator - always visible */}
+                {hasSubtasks && !isOpen && <p className="text-xs text-muted-foreground mt-1">{item.subtasks!.filter(st => st.completed).length}/{item.subtasks!.length} subtasks</p>}
               </div>
               {item.imageUrl && (
                 <div
@@ -288,8 +294,8 @@ export const TaskItem = ({
                   <img src={item.imageUrl} alt="Task attachment" className="w-full h-full object-cover" />
                 </div>
               )}
-              {/* Expand/Collapse button for subtasks - hidden when hideDetails is true */}
-              {!hideDetails && hasSubtasks && (
+              {/* Expand/Collapse button for subtasks - always visible */}
+              {hasSubtasks && (
                 <button
                   onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
                   className="p-1 rounded hover:bg-muted transition-colors flex-shrink-0"
