@@ -237,10 +237,11 @@ export const RichTextEditor = ({
 
           const img = document.createElement('img');
           img.src = imageUrl;
-          img.style.maxWidth = '100%';
+          img.style.maxWidth = '60%';
           img.style.height = 'auto';
           img.style.display = 'block';
           img.style.margin = '10px 0';
+          img.style.borderRadius = '8px';
 
           const selection = window.getSelection();
           if (selection && selection.rangeCount > 0) {
