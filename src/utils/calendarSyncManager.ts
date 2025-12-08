@@ -6,7 +6,7 @@ const SELECTED_CALENDARS_KEY = 'selectedCalendars';
 const LAST_SYNC_TIME_KEY = 'calendarLastSyncTime';
 
 class CalendarSyncManager {
-  private autoSyncInterval: NodeJS.Timeout | null = null;
+  private autoSyncInterval: ReturnType<typeof setInterval> | null = null;
 
   isCalendarSyncEnabled(): boolean {
     return localStorage.getItem(CALENDAR_SYNC_ENABLED_KEY) === 'true';

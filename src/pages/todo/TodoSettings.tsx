@@ -1,6 +1,6 @@
 import { ChevronRight, Settings as SettingsIcon, Cloud, CloudUpload, Calendar, Mail, CheckCircle2, AlertCircle, Grid3X3, Timer, Clock, BarChart3, Focus, CalendarDays, CalendarRange, Plus, Eye, EyeOff, Trash2, Edit2, GripVertical, Target, Zap, Brain, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { syncManager } from '@/utils/syncManager';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
@@ -14,13 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { TodoLayout } from './TodoLayout';
-import { EisenhowerMatrix } from '@/components/EisenhowerMatrix';
-import { PomodoroTimer } from '@/components/PomodoroTimer';
-import { CountdownTimer } from '@/components/CountdownTimer';
-import { TaskAnalytics } from '@/components/TaskAnalytics';
-import { FocusMode } from '@/components/FocusMode';
-import { DailyPlanner } from '@/components/DailyPlanner';
-import { WeeklyReview } from '@/components/WeeklyReview';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +31,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+
+// Lazy load productivity tools to prevent crashes
+const EisenhowerMatrix = lazy(() => import('@/components/EisenhowerMatrix').then(m => ({ default: m.EisenhowerMatrix })));
+const PomodoroTimer = lazy(() => import('@/components/PomodoroTimer').then(m => ({ default: m.PomodoroTimer })));
+const CountdownTimer = lazy(() => import('@/components/CountdownTimer').then(m => ({ default: m.CountdownTimer })));
+const TaskAnalytics = lazy(() => import('@/components/TaskAnalytics').then(m => ({ default: m.TaskAnalytics })));
+const FocusMode = lazy(() => import('@/components/FocusMode').then(m => ({ default: m.FocusMode })));
+const DailyPlanner = lazy(() => import('@/components/DailyPlanner').then(m => ({ default: m.DailyPlanner })));
+const WeeklyReview = lazy(() => import('@/components/WeeklyReview').then(m => ({ default: m.WeeklyReview })));
 
 interface CustomTool {
   id: string;
@@ -110,37 +113,50 @@ const TodoSettings = () => {
   const [availableCategories, setAvailableCategories] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
-    // Load tool visibility settings
-    const savedVisibility = localStorage.getItem('productivityToolVisibility');
-    if (savedVisibility) {
-      setToolVisibility({ ...DEFAULT_TOOL_VISIBILITY, ...JSON.parse(savedVisibility) });
-    }
-    
-    // Load custom tools
-    const savedCustomTools = localStorage.getItem('customProductivityTools');
-    if (savedCustomTools) {
-      setCustomTools(JSON.parse(savedCustomTools));
-    }
-
-    // Load available tasks
-    const savedTasks = localStorage.getItem('todoItems');
-    if (savedTasks) {
-      try {
-        const tasks = JSON.parse(savedTasks);
-        setAvailableTasks(tasks.slice(0, 50).map((t: any) => ({ id: t.id, text: t.text })));
-      } catch (e) {
-        console.error('Failed to load tasks', e);
+    try {
+      // Load tool visibility settings
+      const savedVisibility = localStorage.getItem('productivityToolVisibility');
+      if (savedVisibility) {
+        try {
+          setToolVisibility({ ...DEFAULT_TOOL_VISIBILITY, ...JSON.parse(savedVisibility) });
+        } catch (e) {
+          console.error('Failed to parse tool visibility', e);
+        }
       }
-    }
-
-    // Load available categories
-    const savedCategories = localStorage.getItem('categories');
-    if (savedCategories) {
-      try {
-        setAvailableCategories(JSON.parse(savedCategories));
-      } catch (e) {
-        console.error('Failed to load categories', e);
+      
+      // Load custom tools
+      const savedCustomTools = localStorage.getItem('customProductivityTools');
+      if (savedCustomTools) {
+        try {
+          setCustomTools(JSON.parse(savedCustomTools));
+        } catch (e) {
+          console.error('Failed to parse custom tools', e);
+        }
       }
+
+      // Load available tasks
+      const savedTasks = localStorage.getItem('todoItems');
+      if (savedTasks) {
+        try {
+          const tasks = JSON.parse(savedTasks);
+          setAvailableTasks(Array.isArray(tasks) ? tasks.slice(0, 50).map((t: any) => ({ id: t.id, text: t.text || '' })) : []);
+        } catch (e) {
+          console.error('Failed to load tasks', e);
+        }
+      }
+
+      // Load available categories
+      const savedCategories = localStorage.getItem('categories');
+      if (savedCategories) {
+        try {
+          const parsed = JSON.parse(savedCategories);
+          setAvailableCategories(Array.isArray(parsed) ? parsed : []);
+        } catch (e) {
+          console.error('Failed to load categories', e);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading settings data:', error);
     }
   }, []);
 
@@ -221,17 +237,24 @@ const TodoSettings = () => {
   };
 
   useEffect(() => {
-    isGoogleCalendarEnabled().then(async (connected) => {
-      setIsCalendarConnected(connected);
-      if (connected) {
-        try {
-          const calendars = await calendarSyncManager.fetchAvailableCalendars();
-          setAvailableCalendars(calendars);
-        } catch (error) {
-          console.error('Failed to fetch calendars:', error);
+    const checkCalendarConnection = async () => {
+      try {
+        const connected = await isGoogleCalendarEnabled();
+        setIsCalendarConnected(connected);
+        if (connected) {
+          try {
+            const calendars = await calendarSyncManager.fetchAvailableCalendars();
+            setAvailableCalendars(calendars);
+          } catch (error) {
+            console.error('Failed to fetch calendars:', error);
+          }
         }
+      } catch (error) {
+        console.error('Failed to check calendar connection:', error);
+        setIsCalendarConnected(false);
       }
-    });
+    };
+    checkCalendarConnection();
   }, []);
 
   const handleSyncToggle = async (enabled: boolean) => {
@@ -1184,14 +1207,18 @@ const TodoSettings = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Productivity Tools */}
-      <EisenhowerMatrix isOpen={showEisenhower} onClose={() => setShowEisenhower(false)} />
-      <PomodoroTimer isOpen={showPomodoro} onClose={() => setShowPomodoro(false)} />
-      <CountdownTimer isOpen={showCountdown} onClose={() => setShowCountdown(false)} />
-      <TaskAnalytics isOpen={showAnalytics} onClose={() => setShowAnalytics(false)} />
-      <FocusMode isOpen={showFocusMode} onClose={() => setShowFocusMode(false)} />
-      <DailyPlanner isOpen={showDailyPlanner} onClose={() => setShowDailyPlanner(false)} />
-      <WeeklyReview isOpen={showWeeklyReview} onClose={() => setShowWeeklyReview(false)} />
+      {/* Productivity Tools - Only render when open to prevent crashes */}
+      <ErrorBoundary fallback={null}>
+        <Suspense fallback={null}>
+          {showEisenhower && <EisenhowerMatrix isOpen={showEisenhower} onClose={() => setShowEisenhower(false)} />}
+          {showPomodoro && <PomodoroTimer isOpen={showPomodoro} onClose={() => setShowPomodoro(false)} />}
+          {showCountdown && <CountdownTimer isOpen={showCountdown} onClose={() => setShowCountdown(false)} />}
+          {showAnalytics && <TaskAnalytics isOpen={showAnalytics} onClose={() => setShowAnalytics(false)} />}
+          {showFocusMode && <FocusMode isOpen={showFocusMode} onClose={() => setShowFocusMode(false)} />}
+          {showDailyPlanner && <DailyPlanner isOpen={showDailyPlanner} onClose={() => setShowDailyPlanner(false)} />}
+          {showWeeklyReview && <WeeklyReview isOpen={showWeeklyReview} onClose={() => setShowWeeklyReview(false)} />}
+        </Suspense>
+      </ErrorBoundary>
 
       {/* Add/Edit Custom Tool Dialog */}
       <Dialog open={showAddToolDialog} onOpenChange={(open) => { if (!open) resetToolDialog(); else setShowAddToolDialog(true); }}>
