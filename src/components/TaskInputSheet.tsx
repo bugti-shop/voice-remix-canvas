@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { TodoItem, Priority, RepeatType, Folder, ColoredTag, VoiceRecording } from '@/types/note';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -24,7 +24,8 @@ import {
   Settings2,
   ListTodo,
   FileText,
-  MapPin
+  MapPin,
+  Sparkles
 } from 'lucide-react';
 import { EditActionsSheet, ActionItem, defaultActions } from './EditActionsSheet';
 import { WaveformVisualizer } from './WaveformVisualizer';
@@ -34,6 +35,7 @@ import { format } from 'date-fns';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { TaskDateTimePage, RepeatSettings } from './TaskDateTimePage';
+import { parseNaturalLanguageTask, hasNaturalLanguagePatterns } from '@/utils/naturalLanguageParser';
 
 interface TaskSection {
   id: string;
@@ -114,6 +116,16 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
 
   const folderColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
+  // Natural language parsing - real-time preview
+  const parsedTask = useMemo(() => {
+    if (!taskText.trim()) return null;
+    return parseNaturalLanguageTask(taskText);
+  }, [taskText]);
+
+  const hasNLPPatterns = useMemo(() => {
+    return hasNaturalLanguagePatterns(taskText);
+  }, [taskText]);
+
   const handleSaveActions = (actions: ActionItem[]) => {
     setActionItems(actions);
     localStorage.setItem('taskInputActions', JSON.stringify(actions));
@@ -181,10 +193,18 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
       await Haptics.impact({ style: ImpactStyle.Light });
     } catch {}
 
+    // Use natural language parsing to extract date/time/priority from text
+    const parsed = taskText.trim() ? parseNaturalLanguageTask(taskText) : null;
+    
+    // Use parsed values if available, otherwise use manually set values
+    const finalText = parsed?.text || taskText || (voiceRecording ? 'Voice Task' : '');
+    const finalDueDate = dueDate || parsed?.dueDate;
+    const finalPriority = priority !== 'none' ? priority : parsed?.priority;
+
     const mainTask: Omit<TodoItem, 'id' | 'completed'> = {
-      text: taskText || (voiceRecording ? 'Voice Task' : ''),
-      priority: priority !== 'none' ? priority : undefined,
-      dueDate: dueDate,
+      text: finalText,
+      priority: finalPriority,
+      dueDate: finalDueDate,
       reminderTime: reminderTime || deadlineReminderTime,
       repeatType: repeatType !== 'none' ? repeatType : undefined,
       repeatDays: repeatType === 'custom' && repeatDays.length > 0 ? repeatDays : undefined,
@@ -527,7 +547,7 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
           <div className="flex items-center gap-3 mb-5">
             <Input
               ref={inputRef}
-              placeholder="What would you like to do?"
+              placeholder="e.g. Buy groceries tomorrow at 5pm"
               value={taskText}
               onChange={(e) => setTaskText(e.target.value)}
               onKeyDown={(e) => {
@@ -576,7 +596,30 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
             )}
           </div>
 
-          {/* Voice Recording Display */}
+          {/* Natural Language Parsing Preview */}
+          {hasNLPPatterns && parsedTask && (parsedTask.dueDate || parsedTask.priority) && (
+            <div className="flex items-center gap-2 mb-3 px-1 flex-wrap">
+              <Sparkles className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+              <span className="text-xs text-muted-foreground">Detected:</span>
+              {parsedTask.dueDate && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary">
+                  <CalendarIcon className="h-3 w-3" />
+                  {format(parsedTask.dueDate, 'MMM d, h:mm a')}
+                </span>
+              )}
+              {parsedTask.priority && (
+                <span className={cn(
+                  "inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full",
+                  parsedTask.priority === 'high' && "bg-red-500/10 text-red-500",
+                  parsedTask.priority === 'medium' && "bg-yellow-500/10 text-yellow-500",
+                  parsedTask.priority === 'low' && "bg-green-500/10 text-green-500",
+                )}>
+                  <Flag className="h-3 w-3" />
+                  {parsedTask.priority}
+                </span>
+              )}
+            </div>
+          )}
           {voiceRecording && (
             <div className="px-4 py-3 bg-primary/10 rounded-lg flex items-center gap-3 mb-4 border border-primary/20">
               <button
