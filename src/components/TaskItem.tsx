@@ -24,6 +24,7 @@ interface TaskItemProps {
   expandedTasks?: Set<string>;
   onToggleSubtasks?: (taskId: string) => void;
   onUpdateSubtask?: (parentId: string, subtaskId: string, updates: Partial<TodoItem>) => void;
+  hideDetails?: boolean;
 }
 
 const PLAYBACK_SPEEDS = [0.5, 1, 1.5, 2];
@@ -49,7 +50,8 @@ export const TaskItem = ({
   onSelect,
   expandedTasks,
   onToggleSubtasks,
-  onUpdateSubtask
+  onUpdateSubtask,
+  hideDetails = false
 }: TaskItemProps) => {
   // Default to collapsed (false) for subtasks
   const [localIsOpen, setLocalIsOpen] = useState(false);
@@ -254,8 +256,8 @@ export const TaskItem = ({
                     {item.repeatType && item.repeatType !== 'none' && <Repeat className="h-3 w-3 text-purple-500 flex-shrink-0" />}
                   </div>
                 )}
-                {/* Colored tags display */}
-                {item.coloredTags && item.coloredTags.length > 0 && !item.voiceRecording && (
+                {/* Colored tags display - hidden when hideDetails is true */}
+                {!hideDetails && item.coloredTags && item.coloredTags.length > 0 && !item.voiceRecording && (
                   <div className="flex items-center gap-1 mt-1 overflow-hidden">
                     {item.coloredTags.slice(0, 3).map((tag) => (
                       <span 
@@ -275,7 +277,8 @@ export const TaskItem = ({
                     )}
                   </div>
                 )}
-                {hasSubtasks && !isOpen && <p className="text-xs text-muted-foreground mt-1">{item.subtasks!.filter(st => st.completed).length}/{item.subtasks!.length} subtasks</p>}
+                {/* Subtasks indicator - hidden when hideDetails is true */}
+                {!hideDetails && hasSubtasks && !isOpen && <p className="text-xs text-muted-foreground mt-1">{item.subtasks!.filter(st => st.completed).length}/{item.subtasks!.length} subtasks</p>}
               </div>
               {item.imageUrl && (
                 <div
@@ -285,8 +288,8 @@ export const TaskItem = ({
                   <img src={item.imageUrl} alt="Task attachment" className="w-full h-full object-cover" />
                 </div>
               )}
-              {/* Expand/Collapse button for subtasks - at the right end */}
-              {hasSubtasks && (
+              {/* Expand/Collapse button for subtasks - hidden when hideDetails is true */}
+              {!hideDetails && hasSubtasks && (
                 <button
                   onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
                   className="p-1 rounded hover:bg-muted transition-colors flex-shrink-0"
