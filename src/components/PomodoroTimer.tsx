@@ -168,19 +168,48 @@ export const PomodoroTimer = ({ isOpen, onClose }: PomodoroTimerProps) => {
   const updateTaskTimeTracking = (taskId: string, taskText: string, duration: number) => {
     setTaskTimeTracking(prev => {
       const existing = prev.find(t => t.taskId === taskId);
+      let newTracking: TaskTimeTracking[];
+      
       if (existing) {
-        return prev.map(t => 
+        const newTotalMinutes = existing.totalMinutes + duration;
+        const goalMinutes = existing.goalMinutes;
+        
+        // Check for milestone notifications
+        if (goalMinutes) {
+          const oldProgress = (existing.totalMinutes / goalMinutes) * 100;
+          const newProgress = (newTotalMinutes / goalMinutes) * 100;
+          
+          // 80% milestone
+          if (oldProgress < 80 && newProgress >= 80 && newProgress < 100) {
+            toast.success(`🎯 Almost there! ${taskText} is 80% complete!`, {
+              duration: 5000,
+              description: `${formatDuration(newTotalMinutes)} of ${formatDuration(goalMinutes)} goal reached`
+            });
+            try { Haptics.impact({ style: ImpactStyle.Heavy }); } catch {}
+          }
+          
+          // 100% milestone
+          if (oldProgress < 100 && newProgress >= 100) {
+            toast.success(`🎉 Goal Complete! ${taskText}`, {
+              duration: 8000,
+              description: `You've reached your ${formatDuration(goalMinutes)} goal! Congratulations!`
+            });
+            try { Haptics.impact({ style: ImpactStyle.Heavy }); } catch {}
+          }
+        }
+        
+        newTracking = prev.map(t => 
           t.taskId === taskId 
             ? { 
                 ...t, 
-                totalMinutes: t.totalMinutes + duration,
+                totalMinutes: newTotalMinutes,
                 sessionsCount: t.sessionsCount + 1,
                 lastSession: new Date()
               }
             : t
         );
       } else {
-        return [...prev, {
+        newTracking = [...prev, {
           taskId,
           taskText,
           totalMinutes: duration,
@@ -188,6 +217,8 @@ export const PomodoroTimer = ({ isOpen, onClose }: PomodoroTimerProps) => {
           lastSession: new Date()
         }];
       }
+      
+      return newTracking;
     });
   };
 
