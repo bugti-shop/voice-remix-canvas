@@ -485,14 +485,14 @@ export const UnifiedDragDropList = ({
       {/* Global drop indicator - follows dragged item */}
       <div 
         ref={indicatorRef}
-        className="absolute left-4 right-4 h-1 bg-blue-500 rounded-full z-[60] pointer-events-none shadow-[0_0_12px_3px_rgba(59,130,246,0.6)]"
+        className="absolute left-4 right-4 h-1 bg-blue-500 rounded-full z-[60] pointer-events-none"
         style={{ 
           opacity: 0,
           transition: 'top 0.05s linear',
         }}
       >
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-blue-500 rounded-full shadow-lg" />
-        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-blue-500 rounded-full shadow-lg" />
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-blue-500 rounded-full" />
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-blue-500 rounded-full" />
       </div>
       {sortedSections.map(section => {
         const sectionTasks = items.filter(item => 

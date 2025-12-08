@@ -736,21 +736,27 @@ const Today = () => {
     return viewMode === 'flat' ? (
       <div key={item.id} className="relative">
         <div className="relative overflow-hidden">
-          {/* Swipe action backgrounds */}
-          <div className="absolute inset-0 flex">
-            <div className={cn(
-              "flex-1 flex items-center justify-start pl-4 transition-colors",
-              currentSwipe && currentSwipe.x > SWIPE_THRESHOLD ? "bg-green-500" : "bg-green-500/70"
-            )}>
-              <Check className="h-5 w-5 text-white" />
+          {/* Swipe action backgrounds - only show relevant color based on direction */}
+          {currentSwipe && currentSwipe.isSwiping && (
+            <div className="absolute inset-0 flex">
+              {currentSwipe.x > 0 && (
+                <div className={cn(
+                  "absolute inset-0 flex items-center justify-start pl-4 transition-colors",
+                  currentSwipe.x > SWIPE_THRESHOLD ? "bg-green-500" : "bg-green-500/70"
+                )}>
+                  <Check className="h-5 w-5 text-white" />
+                </div>
+              )}
+              {currentSwipe.x < 0 && (
+                <div className={cn(
+                  "absolute inset-0 flex items-center justify-end pr-4 transition-colors",
+                  currentSwipe.x < -SWIPE_THRESHOLD ? "bg-red-500" : "bg-red-500/70"
+                )}>
+                  <TrashIcon className="h-5 w-5 text-white" />
+                </div>
+              )}
             </div>
-            <div className={cn(
-              "flex-1 flex items-center justify-end pr-4 transition-colors",
-              currentSwipe && currentSwipe.x < -SWIPE_THRESHOLD ? "bg-red-500" : "bg-red-500/70"
-            )}>
-              <TrashIcon className="h-5 w-5 text-white" />
-            </div>
-          </div>
+          )}
           
           {/* Main flat item */}
           <div 
@@ -1067,21 +1073,25 @@ const Today = () => {
                   
                   return (
                     <div className="relative overflow-hidden">
-                      {/* Swipe action backgrounds - only show when actively swiping */}
+                      {/* Swipe action backgrounds - only show relevant color based on direction */}
                       {currentSubtaskSwipe && currentSubtaskSwipe.isSwiping && (
                         <div className="absolute inset-0 flex">
-                          <div className={cn(
-                            "flex-1 flex items-center justify-start pl-4 transition-colors",
-                            currentSubtaskSwipe.x > SWIPE_THRESHOLD ? "bg-green-500" : "bg-green-500/70"
-                          )}>
-                            <Check className="h-4 w-4 text-white" />
-                          </div>
-                          <div className={cn(
-                            "flex-1 flex items-center justify-end pr-4 transition-colors",
-                            currentSubtaskSwipe.x < -SWIPE_THRESHOLD ? "bg-red-500" : "bg-red-500/70"
-                          )}>
-                            <TrashIcon className="h-4 w-4 text-white" />
-                          </div>
+                          {currentSubtaskSwipe.x > 0 && (
+                            <div className={cn(
+                              "absolute inset-0 flex items-center justify-start pl-4 transition-colors",
+                              currentSubtaskSwipe.x > SWIPE_THRESHOLD ? "bg-green-500" : "bg-green-500/70"
+                            )}>
+                              <Check className="h-4 w-4 text-white" />
+                            </div>
+                          )}
+                          {currentSubtaskSwipe.x < 0 && (
+                            <div className={cn(
+                              "absolute inset-0 flex items-center justify-end pr-4 transition-colors",
+                              currentSubtaskSwipe.x < -SWIPE_THRESHOLD ? "bg-red-500" : "bg-red-500/70"
+                            )}>
+                              <TrashIcon className="h-4 w-4 text-white" />
+                            </div>
+                          )}
                         </div>
                       )}
                       
