@@ -1,6 +1,7 @@
 import { ChevronRight, Settings as SettingsIcon, Cloud, CloudUpload, Calendar, Mail, CheckCircle2, AlertCircle, Grid3X3, Timer, Clock, BarChart3, Focus, CalendarDays, CalendarRange, Plus, Eye, EyeOff, Trash2, Edit2, GripVertical, Target, Zap, Brain, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { syncManager } from '@/utils/syncManager';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import { Button } from '@/components/ui/button';
@@ -71,6 +72,7 @@ const TOOL_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b
 
 const TodoSettings = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showRestoreDialog, setShowRestoreDialog] = useState(false);
   const [showTermsDialog, setShowTermsDialog] = useState(false);
@@ -688,7 +690,7 @@ const TodoSettings = () => {
                 return (
                   <div key={tool.id} className="flex items-center">
                     <button
-                      onClick={() => !showManageTools && toast({ title: tool.name, description: tool.description })}
+                      onClick={() => !showManageTools && navigate(`/todo/tool/${tool.id}`)}
                       className="flex-1 flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors"
                     >
                       <div className="p-2 rounded-lg" style={{ backgroundColor: `${tool.color}20` }}>
