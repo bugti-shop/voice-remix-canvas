@@ -1,9 +1,14 @@
-import { addDays, addWeeks, addMonths, setHours, setMinutes, startOfDay, nextMonday, nextTuesday, nextWednesday, nextThursday, nextFriday, nextSaturday, nextSunday, isMonday, isTuesday, isWednesday, isThursday, isFriday, isSaturday, isSunday } from 'date-fns';
+import { addDays, addWeeks, addMonths, addHours, addMinutes, setHours, setMinutes, startOfDay, nextMonday, nextTuesday, nextWednesday, nextThursday, nextFriday, nextSaturday, nextSunday, isMonday, isTuesday, isWednesday, isThursday, isFriday, isSaturday, isSunday } from 'date-fns';
+import { RepeatType } from '@/types/note';
 
 export interface ParsedTask {
   text: string;
   dueDate?: Date;
+  reminderTime?: Date;
   priority?: 'high' | 'medium' | 'low';
+  repeatType?: RepeatType;
+  repeatDays?: number[]; // 0-6 for Sunday-Saturday
+  location?: string;
 }
 
 // Time patterns
@@ -16,6 +21,65 @@ const timePatterns = [
   /\b(\d{1,2}):(\d{2})\b/,
   // "in the morning", "in the evening", etc.
   /\bin the (morning|afternoon|evening|night)\b/i,
+];
+
+// Relative time patterns for reminders
+const relativeTimePatterns: { pattern: RegExp; getDate: (match: RegExpMatchArray) => Date }[] = [
+  // "in 5 minutes", "in 30 mins"
+  { pattern: /\bin\s+(\d+)\s*(?:min(?:ute)?s?)\b/i, getDate: (m) => addMinutes(new Date(), parseInt(m[1])) },
+  // "in 2 hours", "in 1 hour"
+  { pattern: /\bin\s+(\d+)\s*(?:hour?s?|hr?s?)\b/i, getDate: (m) => addHours(new Date(), parseInt(m[1])) },
+  // "in half an hour", "in 30 minutes"
+  { pattern: /\bin\s+(?:half\s+an?\s+hour|30\s*min)/i, getDate: () => addMinutes(new Date(), 30) },
+  // "in an hour"
+  { pattern: /\bin\s+an?\s+hour\b/i, getDate: () => addHours(new Date(), 1) },
+];
+
+// Recurring patterns
+const recurringPatterns: { pattern: RegExp; getRepeat: (match: RegExpMatchArray) => { type: RepeatType; days?: number[] } }[] = [
+  // "every day", "daily"
+  { pattern: /\b(?:every\s*day|daily)\b/i, getRepeat: () => ({ type: 'daily' }) },
+  // "every week", "weekly"
+  { pattern: /\b(?:every\s*week|weekly)\b/i, getRepeat: () => ({ type: 'weekly' }) },
+  // "every month", "monthly"
+  { pattern: /\b(?:every\s*month|monthly)\b/i, getRepeat: () => ({ type: 'monthly' }) },
+  // "every year", "yearly", "annually" - map to monthly as yearly is not in RepeatType
+  { pattern: /\b(?:every\s*year|yearly|annually)\b/i, getRepeat: () => ({ type: 'monthly' }) },
+  // "every weekday", "weekdays"
+  { pattern: /\b(?:every\s*weekday|weekdays|on\s*weekdays)\b/i, getRepeat: () => ({ type: 'weekdays' }) },
+  // "every weekend", "weekends"
+  { pattern: /\b(?:every\s*weekend|weekends|on\s*weekends)\b/i, getRepeat: () => ({ type: 'weekends' }) },
+  // "every monday", "every tuesday", etc.
+  { pattern: /\bevery\s*(monday|mon)\b/i, getRepeat: () => ({ type: 'custom', days: [1] }) },
+  { pattern: /\bevery\s*(tuesday|tue|tues)\b/i, getRepeat: () => ({ type: 'custom', days: [2] }) },
+  { pattern: /\bevery\s*(wednesday|wed)\b/i, getRepeat: () => ({ type: 'custom', days: [3] }) },
+  { pattern: /\bevery\s*(thursday|thu|thurs)\b/i, getRepeat: () => ({ type: 'custom', days: [4] }) },
+  { pattern: /\bevery\s*(friday|fri)\b/i, getRepeat: () => ({ type: 'custom', days: [5] }) },
+  { pattern: /\bevery\s*(saturday|sat)\b/i, getRepeat: () => ({ type: 'custom', days: [6] }) },
+  { pattern: /\bevery\s*(sunday|sun)\b/i, getRepeat: () => ({ type: 'custom', days: [0] }) },
+  // "every mon and wed", "every monday, wednesday and friday"
+  { pattern: /\bevery\s+((?:(?:mon(?:day)?|tue(?:s(?:day)?)?|wed(?:nesday)?|thu(?:r(?:s(?:day)?)?)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)\s*(?:,|and|&)\s*)+(?:mon(?:day)?|tue(?:s(?:day)?)?|wed(?:nesday)?|thu(?:r(?:s(?:day)?)?)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?))\b/i, 
+    getRepeat: (m) => {
+      const dayMap: { [key: string]: number } = {
+        sun: 0, sunday: 0, mon: 1, monday: 1, tue: 2, tues: 2, tuesday: 2,
+        wed: 3, wednesday: 3, thu: 4, thur: 4, thurs: 4, thursday: 4,
+        fri: 5, friday: 5, sat: 6, saturday: 6
+      };
+      const days = m[1].toLowerCase().match(/\b(mon(?:day)?|tue(?:s(?:day)?)?|wed(?:nesday)?|thu(?:r(?:s(?:day)?)?)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)\b/gi) || [];
+      const dayNumbers = [...new Set(days.map(d => dayMap[d.toLowerCase().replace(/day$/, '')] ?? dayMap[d.toLowerCase()]))];
+      return { type: 'custom', days: dayNumbers.sort() };
+    }
+  },
+];
+
+// Location patterns
+const locationPatterns = [
+  // "at the office", "at home", "at work"
+  /\bat\s+(?:the\s+)?(office|home|work|gym|school|store|market|mall|hospital|clinic|bank|library|cafe|restaurant|airport|station)\b/i,
+  // "at [place name]" - captures location after "at"
+  /\bat\s+([A-Z][a-zA-Z']+(?:\s+[A-Z][a-zA-Z']+)*)\b/,
+  // "@location"
+  /@([a-zA-Z][a-zA-Z0-9\s]+)/,
 ];
 
 // Date patterns
@@ -83,7 +147,6 @@ const datePatterns: { pattern: RegExp; getDate: (match: RegExpMatchArray) => Dat
       const date = new Date();
       date.setMonth(month, day);
       date.setHours(0, 0, 0, 0);
-      // If the date is in the past, move to next year
       if (date < new Date()) {
         date.setFullYear(date.getFullYear() + 1);
       }
@@ -124,12 +187,22 @@ const datePatterns: { pattern: RegExp; getDate: (match: RegExpMatchArray) => Dat
 
 // Priority patterns
 const priorityPatterns: { pattern: RegExp; priority: 'high' | 'medium' | 'low' }[] = [
-  { pattern: /\b(high priority|urgent|important|asap|!{2,})\b/i, priority: 'high' },
-  { pattern: /\b(medium priority|normal)\b/i, priority: 'medium' },
-  { pattern: /\b(low priority|later|whenever)\b/i, priority: 'low' },
+  { pattern: /\b(high priority|urgent|important|asap|critical|!{2,})\b/i, priority: 'high' },
+  { pattern: /\b(medium priority|normal|moderate)\b/i, priority: 'medium' },
+  { pattern: /\b(low priority|later|whenever|someday)\b/i, priority: 'low' },
   { pattern: /!{3,}/, priority: 'high' },
   { pattern: /!!/, priority: 'medium' },
   { pattern: /!$/, priority: 'low' },
+  // Priority shortcuts: p1, p2, p3
+  { pattern: /\bp1\b/i, priority: 'high' },
+  { pattern: /\bp2\b/i, priority: 'medium' },
+  { pattern: /\bp3\b/i, priority: 'low' },
+];
+
+// Reminder patterns
+const reminderPatterns = [
+  /\bremind(?:\s+me)?\s+(?:in\s+)?(\d+)\s*(min(?:ute)?s?|hour?s?|hr?s?)\s*(?:before)?\b/i,
+  /\bremind(?:\s+me)?\s+(.+)/i,
 ];
 
 function parseTime(text: string): { hours: number; minutes: number; matched: string } | null {
@@ -184,6 +257,40 @@ function parseTime(text: string): { hours: number; minutes: number; matched: str
   return null;
 }
 
+function parseRelativeTime(text: string): { date: Date; matched: string } | null {
+  for (const { pattern, getDate } of relativeTimePatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      return { date: getDate(match), matched: match[0] };
+    }
+  }
+  return null;
+}
+
+function parseRecurring(text: string): { type: RepeatType; days?: number[]; matched: string } | null {
+  for (const { pattern, getRepeat } of recurringPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const result = getRepeat(match);
+      return { ...result, matched: match[0] };
+    }
+  }
+  return null;
+}
+
+function parseLocation(text: string): { location: string; matched: string } | null {
+  for (const pattern of locationPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const location = match[1]?.trim();
+      if (location && location.length > 1) {
+        return { location, matched: match[0] };
+      }
+    }
+  }
+  return null;
+}
+
 function parseDate(text: string): { date: Date; matched: string } | null {
   for (const { pattern, getDate } of datePatterns) {
     const match = text.match(pattern);
@@ -207,13 +314,57 @@ function parsePriority(text: string): { priority: 'high' | 'medium' | 'low'; mat
 export function parseNaturalLanguageTask(input: string): ParsedTask {
   let text = input.trim();
   let dueDate: Date | undefined;
+  let reminderTime: Date | undefined;
   let priority: 'high' | 'medium' | 'low' | undefined;
+  let repeatType: RepeatType | undefined;
+  let repeatDays: number[] | undefined;
+  let location: string | undefined;
   
-  // Parse date first
-  const dateResult = parseDate(text);
-  if (dateResult) {
-    dueDate = dateResult.date;
-    text = text.replace(dateResult.matched, '').trim();
+  // Parse recurring pattern first (before date, as "every monday" shouldn't be parsed as a date)
+  const recurringResult = parseRecurring(text);
+  if (recurringResult) {
+    repeatType = recurringResult.type;
+    repeatDays = recurringResult.days;
+    text = text.replace(recurringResult.matched, '').trim();
+    
+    // For recurring tasks, set the first occurrence date
+    if (repeatDays && repeatDays.length > 0) {
+      const today = new Date();
+      const currentDay = today.getDay();
+      const nextDay = repeatDays.find(d => d > currentDay) ?? repeatDays[0];
+      const daysUntil = (nextDay - currentDay + 7) % 7 || 7;
+      dueDate = startOfDay(addDays(today, daysUntil));
+    } else if (repeatType === 'weekdays') {
+      const today = new Date();
+      const currentDay = today.getDay();
+      // Find next weekday
+      let daysUntil = 1;
+      if (currentDay === 5) daysUntil = 3; // Friday -> Monday
+      else if (currentDay === 6) daysUntil = 2; // Saturday -> Monday
+      dueDate = startOfDay(addDays(today, daysUntil));
+    } else if (repeatType === 'weekends') {
+      const today = new Date();
+      const currentDay = today.getDay();
+      const daysUntilSaturday = (6 - currentDay + 7) % 7 || 7;
+      dueDate = startOfDay(addDays(today, daysUntilSaturday));
+    }
+  }
+  
+  // Parse relative time ("in 2 hours", "in 30 minutes")
+  const relativeTimeResult = parseRelativeTime(text);
+  if (relativeTimeResult) {
+    dueDate = relativeTimeResult.date;
+    reminderTime = relativeTimeResult.date;
+    text = text.replace(relativeTimeResult.matched, '').trim();
+  }
+  
+  // Parse date (if not already set by recurring/relative)
+  if (!dueDate) {
+    const dateResult = parseDate(text);
+    if (dateResult) {
+      dueDate = dateResult.date;
+      text = text.replace(dateResult.matched, '').trim();
+    }
   }
   
   // Parse time
@@ -235,6 +386,13 @@ export function parseNaturalLanguageTask(input: string): ParsedTask {
     text = text.replace(priorityResult.matched, '').trim();
   }
   
+  // Parse location
+  const locationResult = parseLocation(text);
+  if (locationResult) {
+    location = locationResult.location;
+    text = text.replace(locationResult.matched, '').trim();
+  }
+  
   // Clean up the text
   text = text
     .replace(/\s+/g, ' ')  // Multiple spaces to single
@@ -243,12 +401,18 @@ export function parseNaturalLanguageTask(input: string): ParsedTask {
     .replace(/\s+at\s*$/, '') // Trailing "at"
     .replace(/\s+on\s*$/, '') // Trailing "on"
     .replace(/\s+by\s*$/, '') // Trailing "by"
+    .replace(/\s+in\s*$/, '') // Trailing "in"
+    .replace(/\s+every\s*$/, '') // Trailing "every"
     .trim();
   
   return {
     text: text || input.trim(), // Fallback to original if empty
     dueDate,
+    reminderTime,
     priority,
+    repeatType,
+    repeatDays,
+    location,
   };
 }
 
@@ -258,7 +422,47 @@ export function hasNaturalLanguagePatterns(input: string): boolean {
     ...datePatterns.map(p => p.pattern),
     ...timePatterns,
     ...priorityPatterns.map(p => p.pattern),
+    ...recurringPatterns.map(p => p.pattern),
+    ...relativeTimePatterns.map(p => p.pattern),
+    ...locationPatterns,
   ];
   
   return allPatterns.some(pattern => pattern.test(input));
+}
+
+// Format parsed result for display
+export function formatParsedResult(parsed: ParsedTask): string[] {
+  const results: string[] = [];
+  
+  if (parsed.dueDate) {
+    const now = new Date();
+    const diffMs = parsed.dueDate.getTime() - now.getTime();
+    const diffMins = Math.round(diffMs / 60000);
+    const diffHours = Math.round(diffMs / 3600000);
+    
+    if (diffMins < 60) {
+      results.push(`in ${diffMins} min`);
+    } else if (diffHours < 24) {
+      results.push(`in ${diffHours} hour${diffHours > 1 ? 's' : ''}`);
+    }
+  }
+  
+  if (parsed.repeatType) {
+    if (parsed.repeatType === 'custom' && parsed.repeatDays) {
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      results.push(`Every ${parsed.repeatDays.map(d => dayNames[d]).join(', ')}`);
+    } else {
+      results.push(parsed.repeatType.charAt(0).toUpperCase() + parsed.repeatType.slice(1));
+    }
+  }
+  
+  if (parsed.location) {
+    results.push(`@ ${parsed.location}`);
+  }
+  
+  if (parsed.priority) {
+    results.push(`${parsed.priority} priority`);
+  }
+  
+  return results;
 }
