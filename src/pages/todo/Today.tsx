@@ -787,43 +787,7 @@ const Today = () => {
             )}
           </div>
         </div>
-        
-        {/* Collapsible Subtasks */}
-        {hasSubtasks && isExpanded && (
-          <div className="ml-8 border-l-2 border-muted/50 bg-muted/10">
-            {item.subtasks!.map((subtask) => (
-              <div
-                key={subtask.id}
-                className="flex items-start gap-3 py-2 px-3 border-b border-border/30"
-              >
-                <Checkbox
-                  checked={subtask.completed}
-                  onCheckedChange={async (checked) => {
-                    updateSubtask(item.id, subtask.id, { completed: !!checked });
-                    if (checked && !subtask.completed) {
-                      try { await Haptics.impact({ style: ImpactStyle.Light }); } catch {}
-                    }
-                  }}
-                  className={cn(
-                    "h-4 w-4 rounded-sm mt-0.5 flex-shrink-0",
-                    subtask.completed 
-                      ? "bg-muted-foreground/30 border-0 data-[state=checked]:bg-muted-foreground/30 data-[state=checked]:text-white" 
-                      : "border-2 border-muted-foreground/40"
-                  )}
-                />
-                <span className={cn(
-                  "text-sm flex-1",
-                  subtask.completed && "text-muted-foreground"
-                )}>
-                  {subtask.text}
-                </span>
-              </div>
-            ))}
-            <p className="text-xs text-muted-foreground px-3 py-1.5 bg-muted/20">
-              {completedSubtasks}/{totalSubtasks} completed
-            </p>
-          </div>
-        )}
+        {/* Subtasks are rendered by UnifiedDragDropList - not here to avoid duplicates */}
       </div>
     ) : (
       <TaskItem key={item.id} item={item} onUpdate={updateItem} onDelete={deleteItem} onTaskClick={setSelectedTask} onImageClick={setSelectedImage} isSelected={selectedTaskIds.has(item.id)} isSelectionMode={isSelectionMode} onSelect={handleSelectTask} expandedTasks={expandedTasks} onToggleSubtasks={toggleSubtasks} onUpdateSubtask={updateSubtask} />
