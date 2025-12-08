@@ -750,8 +750,14 @@ const Today = () => {
                   )}
                 </div>
               )}
-              {/* Subtasks indicator - hidden when hideDetails is true */}
-              {!hideDetails && hasSubtasks && !isExpanded && (
+              {/* Date display - hidden when hideDetails is true */}
+              {!hideDetails && item.dueDate && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {new Date(item.dueDate).toLocaleDateString()}
+                </p>
+              )}
+              {/* Subtasks indicator - always visible */}
+              {hasSubtasks && !isExpanded && (
                 <p className="text-xs text-muted-foreground mt-1">
                   {completedSubtasks}/{totalSubtasks} subtasks
                 </p>
@@ -766,8 +772,8 @@ const Today = () => {
                 <img src={item.imageUrl} alt="Task attachment" className="w-full h-full object-cover" />
               </div>
             )}
-            {/* Expand/Collapse button for subtasks - hidden when hideDetails is true */}
-            {!hideDetails && hasSubtasks && (
+            {/* Expand/Collapse button for subtasks - always visible */}
+            {hasSubtasks && (
               <button
                 onClick={(e) => { e.stopPropagation(); toggleSubtasks(item.id); }}
                 className="mt-0.5 p-1 rounded hover:bg-muted transition-colors flex-shrink-0"
@@ -1010,10 +1016,13 @@ const Today = () => {
                   </div>
                 )}
                 renderSubtask={(subtask, parentId, isDragging) => (
-                  <div className={cn(
-                    "flex items-start gap-3 py-2 px-3 border-b border-border/30 last:border-b-0 cursor-pointer",
-                    isDragging && "bg-card shadow-lg"
-                  )}>
+                  <div 
+                    className={cn(
+                      "flex items-start gap-3 py-2 px-3 border-b border-border/30 last:border-b-0 cursor-pointer hover:bg-muted/30 transition-colors",
+                      isDragging && "bg-card shadow-lg"
+                    )}
+                    onClick={() => setSelectedSubtask({ subtask, parentId })}
+                  >
                     <Checkbox
                       checked={subtask.completed}
                       onCheckedChange={async (checked) => {
