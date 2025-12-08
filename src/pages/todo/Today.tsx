@@ -274,9 +274,23 @@ const Today = () => {
     setItems(items.map((i) => (i.id === itemId ? { ...i, ...updates } : i)));
   };
 
-  const deleteItem = async (itemId: string) => {
+  const deleteItem = async (itemId: string, showUndo: boolean = false) => {
     try { await Haptics.impact({ style: ImpactStyle.Medium }); } catch {}
+    const deletedItem = items.find(item => item.id === itemId);
     setItems(items.filter((item) => item.id !== itemId));
+    
+    if (showUndo && deletedItem) {
+      toast.success('Task deleted', {
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            setItems(prev => [deletedItem, ...prev]);
+            toast.success('Task restored');
+          }
+        },
+        duration: 5000,
+      });
+    }
   };
 
   // Unified reorder handler for drag-and-drop
@@ -612,7 +626,7 @@ const Today = () => {
     
     if (swipeState.x < -SWIPE_THRESHOLD) {
       try { await Haptics.impact({ style: ImpactStyle.Medium }); } catch {}
-      deleteItem(item.id);
+      deleteItem(item.id, true);
     } else if (swipeState.x > SWIPE_THRESHOLD) {
       try { await Haptics.impact({ style: ImpactStyle.Heavy }); } catch {}
       updateItem(item.id, { completed: !item.completed });
@@ -646,9 +660,12 @@ const Today = () => {
     }));
   };
 
-  const deleteSubtask = (parentId: string, subtaskId: string) => {
+  const deleteSubtask = (parentId: string, subtaskId: string, showUndo: boolean = false) => {
+    let deletedSubtask: TodoItem | null = null;
+    
     setItems(items.map(item => {
       if (item.id === parentId && item.subtasks) {
+        deletedSubtask = item.subtasks.find(st => st.id === subtaskId) || null;
         return {
           ...item,
           subtasks: item.subtasks.filter(st => st.id !== subtaskId)
@@ -656,6 +673,28 @@ const Today = () => {
       }
       return item;
     }));
+
+    if (showUndo && deletedSubtask) {
+      const subtaskToRestore = deletedSubtask;
+      toast.success('Subtask deleted', {
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            setItems(prev => prev.map(item => {
+              if (item.id === parentId) {
+                return {
+                  ...item,
+                  subtasks: [...(item.subtasks || []), subtaskToRestore]
+                };
+              }
+              return item;
+            }));
+            toast.success('Subtask restored');
+          }
+        },
+        duration: 5000,
+      });
+    }
   };
 
   const handleSubtaskSwipeStart = (subtaskId: string, parentId: string, e: React.TouchEvent) => {
@@ -679,7 +718,7 @@ const Today = () => {
     
     if (subtaskSwipeState.x < -SWIPE_THRESHOLD) {
       try { await Haptics.impact({ style: ImpactStyle.Medium }); } catch {}
-      deleteSubtask(parentId, subtask.id);
+      deleteSubtask(parentId, subtask.id, true);
     } else if (subtaskSwipeState.x > SWIPE_THRESHOLD) {
       try { await Haptics.impact({ style: ImpactStyle.Heavy }); } catch {}
       updateSubtask(parentId, subtask.id, { completed: !subtask.completed });
