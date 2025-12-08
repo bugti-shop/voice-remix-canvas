@@ -14,6 +14,7 @@ interface UnifiedDragDropListProps {
   renderSectionHeader: (section: TaskSection, isDragging: boolean) => React.ReactNode;
   renderEmptySection: (section: TaskSection) => React.ReactNode;
   expandedTasks: Set<string>;
+  selectedFolderId?: string | null;
   className?: string;
 }
 
@@ -46,6 +47,7 @@ export const UnifiedDragDropList = ({
   renderSectionHeader,
   renderEmptySection,
   expandedTasks,
+  selectedFolderId,
   className
 }: UnifiedDragDropListProps) => {
   // Use refs for frequently updated values to avoid re-renders
@@ -72,11 +74,22 @@ export const UnifiedDragDropList = ({
   const scrollContainerRef = useRef<HTMLElement | null>(null);
   const indicatorRef = useRef<HTMLDivElement>(null);
 
-  // Memoize sorted sections
-  const sortedSections = useMemo(() => 
-    [...sections].sort((a, b) => a.order - b.order),
-    [sections]
-  );
+  // Memoize sorted sections - filter to only show sections with tasks when a folder is selected
+  const sortedSections = useMemo(() => {
+    const sorted = [...sections].sort((a, b) => a.order - b.order);
+    
+    // When a folder is selected, only show sections that have tasks in that folder
+    if (selectedFolderId) {
+      return sorted.filter(section => {
+        const sectionTasks = items.filter(item => 
+          !item.completed && (item.sectionId === section.id || (!item.sectionId && section.id === sections[0]?.id))
+        );
+        return sectionTasks.length > 0;
+      });
+    }
+    
+    return sorted;
+  }, [sections, selectedFolderId, items]);
 
   const clearLongPressTimer = useCallback(() => {
     if (longPressTimerRef.current) {
