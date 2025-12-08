@@ -731,6 +731,20 @@ export const RichTextEditor = ({
           .title-input::placeholder {
             color: rgba(0, 0, 0, 0.3);
           }
+          /* Enhanced audio player styling */
+          .audio-player-container {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 12px;
+            padding: 12px;
+          }
+          .audio-player-container audio {
+            width: 100%;
+            height: 54px;
+            border-radius: 8px;
+          }
+          .audio-player-container audio::-webkit-media-controls-panel {
+            background: transparent;
+          }
         `}
       </style>
 

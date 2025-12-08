@@ -26,6 +26,8 @@ interface TaskItemProps {
   onUpdateSubtask?: (parentId: string, subtaskId: string, updates: Partial<TodoItem>) => void;
 }
 
+const PLAYBACK_SPEEDS = [0.5, 1, 1.5, 2];
+
 const getPriorityBorderColor = (priority?: Priority) => {
   switch (priority) {
     case 'high': return 'border-red-500';
@@ -62,6 +64,7 @@ export const TaskItem = ({
   const [swipeX, setSwipeX] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -86,6 +89,7 @@ export const TaskItem = ({
     }
 
     const audio = new Audio(item.voiceRecording.audioUrl);
+    audio.playbackRate = playbackSpeed;
     audioRef.current = audio;
     audio.onended = () => {
       setIsPlayingVoice(false);
@@ -93,6 +97,17 @@ export const TaskItem = ({
     };
     audio.play();
     setIsPlayingVoice(true);
+  };
+
+  const cyclePlaybackSpeed = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const currentIndex = PLAYBACK_SPEEDS.indexOf(playbackSpeed);
+    const nextIndex = (currentIndex + 1) % PLAYBACK_SPEEDS.length;
+    const newSpeed = PLAYBACK_SPEEDS[nextIndex];
+    setPlaybackSpeed(newSpeed);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = newSpeed;
+    }
   };
 
   const SWIPE_THRESHOLD = 80;
@@ -224,6 +239,12 @@ export const TaskItem = ({
                       <span className="text-xs text-primary font-medium">
                         {formatDuration(item.voiceRecording.duration)}
                       </span>
+                    </button>
+                    <button
+                      onClick={cyclePlaybackSpeed}
+                      className="px-2 py-1 text-xs font-semibold rounded-md bg-muted hover:bg-muted/80 transition-colors min-w-[40px]"
+                    >
+                      {playbackSpeed}x
                     </button>
                     {item.repeatType && item.repeatType !== 'none' && <Repeat className="h-3 w-3 text-purple-500 flex-shrink-0" />}
                   </div>

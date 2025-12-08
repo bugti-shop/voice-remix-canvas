@@ -273,8 +273,9 @@ export const NoteEditor = ({ note, isOpen, onClose, onSave, defaultType = 'regul
 
   const handleInsertAudioAtCursor = (audioBase64: string, recordingId: string) => {
     // For rich text editors (sticky, lined, regular), insert audio element in content
+    // We use a custom data attribute to identify and render with AudioPlayer component
     if (['sticky', 'lined', 'regular'].includes(noteType)) {
-      const audioHtml = `<div style="margin: 12px 0; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 12px;" data-recording-id="${recordingId}"><audio controls src="${audioBase64}" style="width: 100%; height: 54px;"></audio></div><p><br></p>`;
+      const audioHtml = `<div class="audio-player-container" style="margin: 12px 0;" data-recording-id="${recordingId}" data-audio-src="${audioBase64}"><audio controls src="${audioBase64}" style="width: 100%; height: 54px;"></audio></div><p><br></p>`;
       setContent(prev => prev + audioHtml);
     }
   };
