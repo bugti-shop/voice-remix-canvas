@@ -64,6 +64,7 @@ const Today = () => {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('flat');
+  const [hideDetails, setHideDetails] = useState<boolean>(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('todoItems');
@@ -102,6 +103,8 @@ const Today = () => {
     if (savedTagFilter) setTagFilter(JSON.parse(savedTagFilter));
     const savedViewMode = localStorage.getItem('todoViewMode');
     if (savedViewMode) setViewMode(savedViewMode as ViewMode);
+    const savedHideDetails = localStorage.getItem('todoHideDetails');
+    if (savedHideDetails !== null) setHideDetails(JSON.parse(savedHideDetails));
   }, []);
 
   useEffect(() => { localStorage.setItem('todoItems', JSON.stringify(items)); }, [items]);
@@ -115,6 +118,7 @@ const Today = () => {
     localStorage.setItem('todoTagFilter', JSON.stringify(tagFilter));
   }, [dateFilter, priorityFilter, statusFilter, tagFilter]);
   useEffect(() => { localStorage.setItem('todoViewMode', viewMode); }, [viewMode]);
+  useEffect(() => { localStorage.setItem('todoHideDetails', JSON.stringify(hideDetails)); }, [hideDetails]);
 
   const handleCreateFolder = (name: string, color: string) => {
     const newFolder: Folder = { id: Date.now().toString(), name, color, isDefault: false, createdAt: new Date() };
@@ -728,8 +732,8 @@ const Today = () => {
                   {item.repeatType && item.repeatType !== 'none' && <Repeat className="h-3 w-3 text-purple-500 flex-shrink-0" />}
                 </div>
               )}
-              {/* Tags display */}
-              {item.coloredTags && item.coloredTags.length > 0 && (
+              {/* Tags display - hidden when hideDetails is true */}
+              {!hideDetails && item.coloredTags && item.coloredTags.length > 0 && (
                 <div className="flex items-center gap-1 mt-1 flex-wrap">
                   {item.coloredTags.slice(0, 4).map((tag) => (
                     <span 
@@ -746,8 +750,8 @@ const Today = () => {
                   )}
                 </div>
               )}
-              {/* Subtasks indicator */}
-              {hasSubtasks && !isExpanded && (
+              {/* Subtasks indicator - hidden when hideDetails is true */}
+              {!hideDetails && hasSubtasks && !isExpanded && (
                 <p className="text-xs text-muted-foreground mt-1">
                   {completedSubtasks}/{totalSubtasks} subtasks
                 </p>
@@ -762,8 +766,8 @@ const Today = () => {
                 <img src={item.imageUrl} alt="Task attachment" className="w-full h-full object-cover" />
               </div>
             )}
-            {/* Expand/Collapse button for subtasks - at the right end */}
-            {hasSubtasks && (
+            {/* Expand/Collapse button for subtasks - hidden when hideDetails is true */}
+            {!hideDetails && hasSubtasks && (
               <button
                 onClick={(e) => { e.stopPropagation(); toggleSubtasks(item.id); }}
                 className="mt-0.5 p-1 rounded hover:bg-muted transition-colors flex-shrink-0"
@@ -923,6 +927,10 @@ const Today = () => {
                     <DropdownMenuItem onClick={() => setShowCompleted(!showCompleted)} className="cursor-pointer">
                       {showCompleted ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
                       {showCompleted ? 'Hide Completed' : 'Show Completed'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setHideDetails(!hideDetails)} className="cursor-pointer">
+                      {hideDetails ? <Eye className="h-4 w-4 mr-2" /> : <EyeOff className="h-4 w-4 mr-2" />}
+                      {hideDetails ? 'Show Details' : 'Hide Details'}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setIsFilterSheetOpen(true)} className="cursor-pointer">
                       <Filter className="h-4 w-4 mr-2" />Filter

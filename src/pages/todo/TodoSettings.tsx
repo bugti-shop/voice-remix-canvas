@@ -1,4 +1,4 @@
-import { ChevronRight, Settings as SettingsIcon, Cloud, CloudUpload, Calendar, Mail, CheckCircle2, AlertCircle, Grid3X3, Timer, Clock, BarChart3, Focus, CalendarDays, CalendarRange } from 'lucide-react';
+import { ChevronRight, Settings as SettingsIcon, Cloud, CloudUpload, Calendar, Mail, CheckCircle2, AlertCircle, Grid3X3, Timer, Clock, BarChart3, Focus, CalendarDays, CalendarRange, Plus, Eye, EyeOff, Trash2, Edit2, GripVertical, Target, Zap, Brain, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { syncManager } from '@/utils/syncManager';
@@ -37,6 +37,36 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+interface CustomTool {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  enabled: boolean;
+}
+
+const DEFAULT_TOOL_VISIBILITY: Record<string, boolean> = {
+  eisenhower: true,
+  pomodoro: true,
+  countdown: true,
+  focusMode: true,
+  dailyPlanner: true,
+  weeklyReview: true,
+  analytics: true,
+};
+
+const TOOL_ICONS = [
+  { id: 'target', icon: Target, label: 'Target' },
+  { id: 'zap', icon: Zap, label: 'Zap' },
+  { id: 'brain', icon: Brain, label: 'Brain' },
+  { id: 'sparkles', icon: Sparkles, label: 'Sparkles' },
+  { id: 'timer', icon: Timer, label: 'Timer' },
+  { id: 'focus', icon: Focus, label: 'Focus' },
+];
+
+const TOOL_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4'];
+
 const TodoSettings = () => {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -59,6 +89,101 @@ const TodoSettings = () => {
   const [availableCalendars, setAvailableCalendars] = useState<GoogleCalendar[]>([]);
   const [selectedCalendars, setSelectedCalendars] = useState<string[]>(calendarSyncManager.getSelectedCalendars());
   const [showCalendarSelector, setShowCalendarSelector] = useState(false);
+  
+  // Custom tools state
+  const [toolVisibility, setToolVisibility] = useState<Record<string, boolean>>(DEFAULT_TOOL_VISIBILITY);
+  const [customTools, setCustomTools] = useState<CustomTool[]>([]);
+  const [showAddToolDialog, setShowAddToolDialog] = useState(false);
+  const [editingTool, setEditingTool] = useState<CustomTool | null>(null);
+  const [newToolName, setNewToolName] = useState('');
+  const [newToolDescription, setNewToolDescription] = useState('');
+  const [newToolIcon, setNewToolIcon] = useState('target');
+  const [newToolColor, setNewToolColor] = useState('#3b82f6');
+  const [showManageTools, setShowManageTools] = useState(false);
+
+  useEffect(() => {
+    // Load tool visibility settings
+    const savedVisibility = localStorage.getItem('productivityToolVisibility');
+    if (savedVisibility) {
+      setToolVisibility({ ...DEFAULT_TOOL_VISIBILITY, ...JSON.parse(savedVisibility) });
+    }
+    
+    // Load custom tools
+    const savedCustomTools = localStorage.getItem('customProductivityTools');
+    if (savedCustomTools) {
+      setCustomTools(JSON.parse(savedCustomTools));
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('productivityToolVisibility', JSON.stringify(toolVisibility));
+  }, [toolVisibility]);
+
+  useEffect(() => {
+    localStorage.setItem('customProductivityTools', JSON.stringify(customTools));
+  }, [customTools]);
+
+  const toggleToolVisibility = (toolId: string) => {
+    setToolVisibility(prev => ({ ...prev, [toolId]: !prev[toolId] }));
+  };
+
+  const handleAddCustomTool = () => {
+    if (!newToolName.trim()) {
+      toast({ title: 'Please enter a tool name', variant: 'destructive' });
+      return;
+    }
+
+    const newTool: CustomTool = {
+      id: editingTool?.id || Date.now().toString(),
+      name: newToolName,
+      description: newToolDescription || 'Custom productivity tool',
+      icon: newToolIcon,
+      color: newToolColor,
+      enabled: true,
+    };
+
+    if (editingTool) {
+      setCustomTools(prev => prev.map(t => t.id === editingTool.id ? newTool : t));
+      toast({ title: 'Tool updated' });
+    } else {
+      setCustomTools(prev => [...prev, newTool]);
+      toast({ title: 'Custom tool added' });
+    }
+
+    resetToolDialog();
+  };
+
+  const handleDeleteCustomTool = (toolId: string) => {
+    setCustomTools(prev => prev.filter(t => t.id !== toolId));
+    toast({ title: 'Tool deleted' });
+  };
+
+  const handleEditCustomTool = (tool: CustomTool) => {
+    setEditingTool(tool);
+    setNewToolName(tool.name);
+    setNewToolDescription(tool.description);
+    setNewToolIcon(tool.icon);
+    setNewToolColor(tool.color);
+    setShowAddToolDialog(true);
+  };
+
+  const toggleCustomToolEnabled = (toolId: string) => {
+    setCustomTools(prev => prev.map(t => t.id === toolId ? { ...t, enabled: !t.enabled } : t));
+  };
+
+  const resetToolDialog = () => {
+    setShowAddToolDialog(false);
+    setEditingTool(null);
+    setNewToolName('');
+    setNewToolDescription('');
+    setNewToolIcon('target');
+    setNewToolColor('#3b82f6');
+  };
+
+  const getIconComponent = (iconId: string) => {
+    const found = TOOL_ICONS.find(i => i.id === iconId);
+    return found ? found.icon : Target;
+  };
 
   useEffect(() => {
     isGoogleCalendarEnabled().then(async (connected) => {
@@ -337,111 +462,335 @@ const TodoSettings = () => {
         <div className="max-w-2xl mx-auto space-y-6">
           {/* Productivity Tools Section */}
           <div className="bg-card border rounded-lg">
-            <div className="p-4 border-b">
+            <div className="p-4 border-b flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Timer className="h-5 w-5 text-primary" />
                 <h2 className="font-semibold">Productivity Tools</h2>
               </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowManageTools(!showManageTools)}
+                  className="text-xs"
+                >
+                  {showManageTools ? 'Done' : 'Manage'}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowAddToolDialog(true)}
+                  className="h-8 w-8"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
 
             <div className="divide-y divide-border">
-              <button
-                onClick={() => setShowEisenhower(true)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors"
-              >
-                <div className="p-2 bg-red-100 dark:bg-red-950 rounded-lg">
-                  <Grid3X3 className="h-5 w-5 text-red-500" />
+              {toolVisibility.eisenhower && (
+                <div className="flex items-center">
+                  <button
+                    onClick={() => !showManageTools && setShowEisenhower(true)}
+                    className="flex-1 flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors"
+                  >
+                    <div className="p-2 bg-red-100 dark:bg-red-950 rounded-lg">
+                      <Grid3X3 className="h-5 w-5 text-red-500" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-medium text-sm">Eisenhower Matrix</p>
+                      <p className="text-xs text-muted-foreground">Prioritize by urgency & importance</p>
+                    </div>
+                    {!showManageTools && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                  </button>
+                  {showManageTools && (
+                    <button onClick={() => toggleToolVisibility('eisenhower')} className="p-3">
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  )}
                 </div>
-                <div className="flex-1 text-left">
-                  <p className="font-medium text-sm">Eisenhower Matrix</p>
-                  <p className="text-xs text-muted-foreground">Prioritize by urgency & importance</p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </button>
+              )}
 
-              <button
-                onClick={() => setShowPomodoro(true)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors"
-              >
-                <div className="p-2 bg-orange-100 dark:bg-orange-950 rounded-lg">
-                  <Timer className="h-5 w-5 text-orange-500" />
+              {toolVisibility.pomodoro && (
+                <div className="flex items-center">
+                  <button
+                    onClick={() => !showManageTools && setShowPomodoro(true)}
+                    className="flex-1 flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors"
+                  >
+                    <div className="p-2 bg-orange-100 dark:bg-orange-950 rounded-lg">
+                      <Timer className="h-5 w-5 text-orange-500" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-medium text-sm">Pomodoro Timer</p>
+                      <p className="text-xs text-muted-foreground">Focus sessions with time goals</p>
+                    </div>
+                    {!showManageTools && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                  </button>
+                  {showManageTools && (
+                    <button onClick={() => toggleToolVisibility('pomodoro')} className="p-3">
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  )}
                 </div>
-                <div className="flex-1 text-left">
-                  <p className="font-medium text-sm">Pomodoro Timer</p>
-                  <p className="text-xs text-muted-foreground">Focus sessions with time goals</p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </button>
+              )}
 
-              <button
-                onClick={() => setShowCountdown(true)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors"
-              >
-                <div className="p-2 bg-blue-100 dark:bg-blue-950 rounded-lg">
-                  <Clock className="h-5 w-5 text-blue-500" />
+              {toolVisibility.countdown && (
+                <div className="flex items-center">
+                  <button
+                    onClick={() => !showManageTools && setShowCountdown(true)}
+                    className="flex-1 flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors"
+                  >
+                    <div className="p-2 bg-blue-100 dark:bg-blue-950 rounded-lg">
+                      <Clock className="h-5 w-5 text-blue-500" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-medium text-sm">Countdown Timer</p>
+                      <p className="text-xs text-muted-foreground">Track important deadlines</p>
+                    </div>
+                    {!showManageTools && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                  </button>
+                  {showManageTools && (
+                    <button onClick={() => toggleToolVisibility('countdown')} className="p-3">
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  )}
                 </div>
-                <div className="flex-1 text-left">
-                  <p className="font-medium text-sm">Countdown Timer</p>
-                  <p className="text-xs text-muted-foreground">Track important deadlines</p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </button>
+              )}
 
-              <button
-                onClick={() => setShowFocusMode(true)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors"
-              >
-                <div className="p-2 bg-purple-100 dark:bg-purple-950 rounded-lg">
-                  <Focus className="h-5 w-5 text-purple-500" />
+              {toolVisibility.focusMode && (
+                <div className="flex items-center">
+                  <button
+                    onClick={() => !showManageTools && setShowFocusMode(true)}
+                    className="flex-1 flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors"
+                  >
+                    <div className="p-2 bg-purple-100 dark:bg-purple-950 rounded-lg">
+                      <Focus className="h-5 w-5 text-purple-500" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-medium text-sm">Focus Mode</p>
+                      <p className="text-xs text-muted-foreground">One task at a time</p>
+                    </div>
+                    {!showManageTools && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                  </button>
+                  {showManageTools && (
+                    <button onClick={() => toggleToolVisibility('focusMode')} className="p-3">
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  )}
                 </div>
-                <div className="flex-1 text-left">
-                  <p className="font-medium text-sm">Focus Mode</p>
-                  <p className="text-xs text-muted-foreground">One task at a time</p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </button>
+              )}
 
-              <button
-                onClick={() => setShowDailyPlanner(true)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors"
-              >
-                <div className="p-2 bg-green-100 dark:bg-green-950 rounded-lg">
-                  <CalendarDays className="h-5 w-5 text-green-500" />
+              {toolVisibility.dailyPlanner && (
+                <div className="flex items-center">
+                  <button
+                    onClick={() => !showManageTools && setShowDailyPlanner(true)}
+                    className="flex-1 flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors"
+                  >
+                    <div className="p-2 bg-green-100 dark:bg-green-950 rounded-lg">
+                      <CalendarDays className="h-5 w-5 text-green-500" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-medium text-sm">Daily Planner</p>
+                      <p className="text-xs text-muted-foreground">Plan by time blocks</p>
+                    </div>
+                    {!showManageTools && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                  </button>
+                  {showManageTools && (
+                    <button onClick={() => toggleToolVisibility('dailyPlanner')} className="p-3">
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  )}
                 </div>
-                <div className="flex-1 text-left">
-                  <p className="font-medium text-sm">Daily Planner</p>
-                  <p className="text-xs text-muted-foreground">Plan by time blocks</p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </button>
+              )}
 
-              <button
-                onClick={() => setShowWeeklyReview(true)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors"
-              >
-                <div className="p-2 bg-indigo-100 dark:bg-indigo-950 rounded-lg">
-                  <CalendarRange className="h-5 w-5 text-indigo-500" />
+              {toolVisibility.weeklyReview && (
+                <div className="flex items-center">
+                  <button
+                    onClick={() => !showManageTools && setShowWeeklyReview(true)}
+                    className="flex-1 flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors"
+                  >
+                    <div className="p-2 bg-indigo-100 dark:bg-indigo-950 rounded-lg">
+                      <CalendarRange className="h-5 w-5 text-indigo-500" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-medium text-sm">Weekly Review</p>
+                      <p className="text-xs text-muted-foreground">Reflect on your progress</p>
+                    </div>
+                    {!showManageTools && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                  </button>
+                  {showManageTools && (
+                    <button onClick={() => toggleToolVisibility('weeklyReview')} className="p-3">
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  )}
                 </div>
-                <div className="flex-1 text-left">
-                  <p className="font-medium text-sm">Weekly Review</p>
-                  <p className="text-xs text-muted-foreground">Reflect on your progress</p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </button>
+              )}
 
-              <button
-                onClick={() => setShowAnalytics(true)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors"
-              >
-                <div className="p-2 bg-cyan-100 dark:bg-cyan-950 rounded-lg">
-                  <BarChart3 className="h-5 w-5 text-cyan-500" />
+              {toolVisibility.analytics && (
+                <div className="flex items-center">
+                  <button
+                    onClick={() => !showManageTools && setShowAnalytics(true)}
+                    className="flex-1 flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors"
+                  >
+                    <div className="p-2 bg-cyan-100 dark:bg-cyan-950 rounded-lg">
+                      <BarChart3 className="h-5 w-5 text-cyan-500" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-medium text-sm">Task Analytics</p>
+                      <p className="text-xs text-muted-foreground">Track productivity & streaks</p>
+                    </div>
+                    {!showManageTools && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                  </button>
+                  {showManageTools && (
+                    <button onClick={() => toggleToolVisibility('analytics')} className="p-3">
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  )}
                 </div>
-                <div className="flex-1 text-left">
-                  <p className="font-medium text-sm">Task Analytics</p>
-                  <p className="text-xs text-muted-foreground">Track productivity & streaks</p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </button>
+              )}
+
+              {/* Custom Tools */}
+              {customTools.filter(t => t.enabled).map((tool) => {
+                const IconComponent = getIconComponent(tool.icon);
+                return (
+                  <div key={tool.id} className="flex items-center">
+                    <button
+                      onClick={() => !showManageTools && toast({ title: tool.name, description: tool.description })}
+                      className="flex-1 flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors"
+                    >
+                      <div className="p-2 rounded-lg" style={{ backgroundColor: `${tool.color}20` }}>
+                        <IconComponent className="h-5 w-5" style={{ color: tool.color }} />
+                      </div>
+                      <div className="flex-1 text-left">
+                        <p className="font-medium text-sm">{tool.name}</p>
+                        <p className="text-xs text-muted-foreground">{tool.description}</p>
+                      </div>
+                      {!showManageTools && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                    </button>
+                    {showManageTools && (
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => handleEditCustomTool(tool)} className="p-2">
+                          <Edit2 className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                        <button onClick={() => handleDeleteCustomTool(tool.id)} className="p-2">
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Show hidden tools in manage mode */}
+              {showManageTools && (
+                <>
+                  {!toolVisibility.eisenhower && (
+                    <div className="flex items-center opacity-50">
+                      <div className="flex-1 flex items-center gap-3 px-4 py-3">
+                        <div className="p-2 bg-red-100 dark:bg-red-950 rounded-lg">
+                          <Grid3X3 className="h-5 w-5 text-red-500" />
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p className="font-medium text-sm">Eisenhower Matrix</p>
+                        </div>
+                      </div>
+                      <button onClick={() => toggleToolVisibility('eisenhower')} className="p-3">
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </div>
+                  )}
+                  {!toolVisibility.pomodoro && (
+                    <div className="flex items-center opacity-50">
+                      <div className="flex-1 flex items-center gap-3 px-4 py-3">
+                        <div className="p-2 bg-orange-100 dark:bg-orange-950 rounded-lg">
+                          <Timer className="h-5 w-5 text-orange-500" />
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p className="font-medium text-sm">Pomodoro Timer</p>
+                        </div>
+                      </div>
+                      <button onClick={() => toggleToolVisibility('pomodoro')} className="p-3">
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </div>
+                  )}
+                  {!toolVisibility.countdown && (
+                    <div className="flex items-center opacity-50">
+                      <div className="flex-1 flex items-center gap-3 px-4 py-3">
+                        <div className="p-2 bg-blue-100 dark:bg-blue-950 rounded-lg">
+                          <Clock className="h-5 w-5 text-blue-500" />
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p className="font-medium text-sm">Countdown Timer</p>
+                        </div>
+                      </div>
+                      <button onClick={() => toggleToolVisibility('countdown')} className="p-3">
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </div>
+                  )}
+                  {!toolVisibility.focusMode && (
+                    <div className="flex items-center opacity-50">
+                      <div className="flex-1 flex items-center gap-3 px-4 py-3">
+                        <div className="p-2 bg-purple-100 dark:bg-purple-950 rounded-lg">
+                          <Focus className="h-5 w-5 text-purple-500" />
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p className="font-medium text-sm">Focus Mode</p>
+                        </div>
+                      </div>
+                      <button onClick={() => toggleToolVisibility('focusMode')} className="p-3">
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </div>
+                  )}
+                  {!toolVisibility.dailyPlanner && (
+                    <div className="flex items-center opacity-50">
+                      <div className="flex-1 flex items-center gap-3 px-4 py-3">
+                        <div className="p-2 bg-green-100 dark:bg-green-950 rounded-lg">
+                          <CalendarDays className="h-5 w-5 text-green-500" />
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p className="font-medium text-sm">Daily Planner</p>
+                        </div>
+                      </div>
+                      <button onClick={() => toggleToolVisibility('dailyPlanner')} className="p-3">
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </div>
+                  )}
+                  {!toolVisibility.weeklyReview && (
+                    <div className="flex items-center opacity-50">
+                      <div className="flex-1 flex items-center gap-3 px-4 py-3">
+                        <div className="p-2 bg-indigo-100 dark:bg-indigo-950 rounded-lg">
+                          <CalendarRange className="h-5 w-5 text-indigo-500" />
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p className="font-medium text-sm">Weekly Review</p>
+                        </div>
+                      </div>
+                      <button onClick={() => toggleToolVisibility('weeklyReview')} className="p-3">
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </div>
+                  )}
+                  {!toolVisibility.analytics && (
+                    <div className="flex items-center opacity-50">
+                      <div className="flex-1 flex items-center gap-3 px-4 py-3">
+                        <div className="p-2 bg-cyan-100 dark:bg-cyan-950 rounded-lg">
+                          <BarChart3 className="h-5 w-5 text-cyan-500" />
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p className="font-medium text-sm">Task Analytics</p>
+                        </div>
+                      </div>
+                      <button onClick={() => toggleToolVisibility('analytics')} className="p-3">
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
 
@@ -808,6 +1157,47 @@ const TodoSettings = () => {
       <FocusMode isOpen={showFocusMode} onClose={() => setShowFocusMode(false)} />
       <DailyPlanner isOpen={showDailyPlanner} onClose={() => setShowDailyPlanner(false)} />
       <WeeklyReview isOpen={showWeeklyReview} onClose={() => setShowWeeklyReview(false)} />
+
+      {/* Add/Edit Custom Tool Dialog */}
+      <Dialog open={showAddToolDialog} onOpenChange={(open) => { if (!open) resetToolDialog(); else setShowAddToolDialog(true); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{editingTool ? 'Edit Tool' : 'Add Custom Tool'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Name</Label>
+              <Input value={newToolName} onChange={(e) => setNewToolName(e.target.value)} placeholder="Tool name" />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Input value={newToolDescription} onChange={(e) => setNewToolDescription(e.target.value)} placeholder="Short description" />
+            </div>
+            <div>
+              <Label>Icon</Label>
+              <div className="flex gap-2 mt-1">
+                {TOOL_ICONS.map(({ id, icon: Icon }) => (
+                  <button key={id} onClick={() => setNewToolIcon(id)} className={cn("p-2 rounded-lg border", newToolIcon === id && "border-primary bg-primary/10")}>
+                    <Icon className="h-5 w-5" />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label>Color</Label>
+              <div className="flex gap-2 mt-1">
+                {TOOL_COLORS.map((color) => (
+                  <button key={color} onClick={() => setNewToolColor(color)} className={cn("w-7 h-7 rounded-full border-2", newToolColor === color ? "border-foreground" : "border-transparent")} style={{ backgroundColor: color }} />
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button variant="outline" onClick={resetToolDialog} className="flex-1">Cancel</Button>
+              <Button onClick={handleAddCustomTool} className="flex-1">{editingTool ? 'Update' : 'Add'}</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </TodoLayout>
   );
 };
