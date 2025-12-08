@@ -44,6 +44,8 @@ interface CustomTool {
   icon: string;
   color: string;
   enabled: boolean;
+  linkedTaskIds?: string[];
+  linkedCategoryId?: string;
 }
 
 const DEFAULT_TOOL_VISIBILITY: Record<string, boolean> = {
@@ -99,7 +101,11 @@ const TodoSettings = () => {
   const [newToolDescription, setNewToolDescription] = useState('');
   const [newToolIcon, setNewToolIcon] = useState('target');
   const [newToolColor, setNewToolColor] = useState('#3b82f6');
+  const [newToolLinkedTaskIds, setNewToolLinkedTaskIds] = useState<string[]>([]);
+  const [newToolLinkedCategoryId, setNewToolLinkedCategoryId] = useState<string>('');
   const [showManageTools, setShowManageTools] = useState(false);
+  const [availableTasks, setAvailableTasks] = useState<{ id: string; text: string }[]>([]);
+  const [availableCategories, setAvailableCategories] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
     // Load tool visibility settings
@@ -112,6 +118,27 @@ const TodoSettings = () => {
     const savedCustomTools = localStorage.getItem('customProductivityTools');
     if (savedCustomTools) {
       setCustomTools(JSON.parse(savedCustomTools));
+    }
+
+    // Load available tasks
+    const savedTasks = localStorage.getItem('todoItems');
+    if (savedTasks) {
+      try {
+        const tasks = JSON.parse(savedTasks);
+        setAvailableTasks(tasks.slice(0, 50).map((t: any) => ({ id: t.id, text: t.text })));
+      } catch (e) {
+        console.error('Failed to load tasks', e);
+      }
+    }
+
+    // Load available categories
+    const savedCategories = localStorage.getItem('categories');
+    if (savedCategories) {
+      try {
+        setAvailableCategories(JSON.parse(savedCategories));
+      } catch (e) {
+        console.error('Failed to load categories', e);
+      }
     }
   }, []);
 
@@ -140,6 +167,8 @@ const TodoSettings = () => {
       icon: newToolIcon,
       color: newToolColor,
       enabled: true,
+      linkedTaskIds: newToolLinkedTaskIds.length > 0 ? newToolLinkedTaskIds : undefined,
+      linkedCategoryId: newToolLinkedCategoryId || undefined,
     };
 
     if (editingTool) {
@@ -164,6 +193,8 @@ const TodoSettings = () => {
     setNewToolDescription(tool.description);
     setNewToolIcon(tool.icon);
     setNewToolColor(tool.color);
+    setNewToolLinkedTaskIds(tool.linkedTaskIds || []);
+    setNewToolLinkedCategoryId(tool.linkedCategoryId || '');
     setShowAddToolDialog(true);
   };
 
@@ -178,6 +209,8 @@ const TodoSettings = () => {
     setNewToolDescription('');
     setNewToolIcon('target');
     setNewToolColor('#3b82f6');
+    setNewToolLinkedTaskIds([]);
+    setNewToolLinkedCategoryId('');
   };
 
   const getIconComponent = (iconId: string) => {
@@ -1160,7 +1193,7 @@ const TodoSettings = () => {
 
       {/* Add/Edit Custom Tool Dialog */}
       <Dialog open={showAddToolDialog} onOpenChange={(open) => { if (!open) resetToolDialog(); else setShowAddToolDialog(true); }}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-sm max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingTool ? 'Edit Tool' : 'Add Custom Tool'}</DialogTitle>
           </DialogHeader>
@@ -1191,6 +1224,56 @@ const TodoSettings = () => {
                 ))}
               </div>
             </div>
+            
+            {/* Link to Category */}
+            {availableCategories.length > 0 && (
+              <div>
+                <Label>Link to Category</Label>
+                <select
+                  value={newToolLinkedCategoryId}
+                  onChange={(e) => setNewToolLinkedCategoryId(e.target.value)}
+                  className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm mt-1"
+                >
+                  <option value="">None</option>
+                  {availableCategories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Link to Tasks */}
+            {availableTasks.length > 0 && (
+              <div>
+                <Label>Link to Tasks</Label>
+                <ScrollArea className="h-32 border rounded-md mt-1 p-2">
+                  <div className="space-y-1">
+                    {availableTasks.map((task) => (
+                      <div key={task.id} className="flex items-center gap-2">
+                        <Checkbox
+                          id={`task-${task.id}`}
+                          checked={newToolLinkedTaskIds.includes(task.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setNewToolLinkedTaskIds(prev => [...prev, task.id]);
+                            } else {
+                              setNewToolLinkedTaskIds(prev => prev.filter(id => id !== task.id));
+                            }
+                          }}
+                        />
+                        <label htmlFor={`task-${task.id}`} className="text-sm truncate flex-1 cursor-pointer">
+                          {task.text}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+                {newToolLinkedTaskIds.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">{newToolLinkedTaskIds.length} task(s) linked</p>
+                )}
+              </div>
+            )}
+
             <div className="flex gap-2 pt-2">
               <Button variant="outline" onClick={resetToolDialog} className="flex-1">Cancel</Button>
               <Button onClick={handleAddCustomTool} className="flex-1">{editingTool ? 'Update' : 'Add'}</Button>
