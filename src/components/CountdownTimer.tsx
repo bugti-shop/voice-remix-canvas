@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { 
   X, Play, Pause, RotateCcw, Plus, Trash2, 
   Clock, Bell, BellOff, Edit2, Check
@@ -12,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { toast } from 'sonner';
 import { format, differenceInSeconds, addDays, addHours, addMinutes, addWeeks } from 'date-fns';
+import { ClockTimePicker } from './ClockTimePicker';
 
 interface CountdownItem {
   id: string;
@@ -45,13 +47,16 @@ export const CountdownTimer = ({ isOpen, onClose }: CountdownTimerProps) => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newCountdownName, setNewCountdownName] = useState('');
   const [newCountdownDate, setNewCountdownDate] = useState('');
-  const [newCountdownTime, setNewCountdownTime] = useState('');
+  const [newCountdownHour, setNewCountdownHour] = useState('12');
+  const [newCountdownMinute, setNewCountdownMinute] = useState('00');
+  const [newCountdownPeriod, setNewCountdownPeriod] = useState<'AM' | 'PM'>('AM');
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [newNotify, setNewNotify] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Save countdowns
   useEffect(() => {
@@ -86,13 +91,20 @@ export const CountdownTimer = ({ isOpen, onClose }: CountdownTimerProps) => {
     });
   }, [currentTime, countdowns]);
 
+  const getTimeDisplay = () => {
+    if (newCountdownHour && newCountdownMinute) {
+      return `${newCountdownHour}:${newCountdownMinute} ${newCountdownPeriod}`;
+    }
+    return 'Set time';
+  };
+
   const addCountdown = async () => {
     if (!newCountdownName.trim()) {
       toast.error('Please enter a name');
       return;
     }
 
-    if (!newCountdownDate && !newCountdownTime) {
+    if (!newCountdownDate && (!newCountdownHour || !newCountdownMinute)) {
       toast.error('Please set a date or time');
       return;
     }
@@ -105,14 +117,18 @@ export const CountdownTimer = ({ isOpen, onClose }: CountdownTimerProps) => {
       const [year, month, day] = newCountdownDate.split('-').map(Number);
       targetDate = new Date(year, month - 1, day);
       
-      if (newCountdownTime) {
-        const [hours, minutes] = newCountdownTime.split(':').map(Number);
-        targetDate.setHours(hours, minutes, 0, 0);
+      if (newCountdownHour && newCountdownMinute) {
+        let hours = parseInt(newCountdownHour);
+        if (newCountdownPeriod === 'PM' && hours !== 12) hours += 12;
+        if (newCountdownPeriod === 'AM' && hours === 12) hours = 0;
+        targetDate.setHours(hours, parseInt(newCountdownMinute), 0, 0);
       }
     } else {
       targetDate = new Date();
-      const [hours, minutes] = newCountdownTime.split(':').map(Number);
-      targetDate.setHours(hours, minutes, 0, 0);
+      let hours = parseInt(newCountdownHour);
+      if (newCountdownPeriod === 'PM' && hours !== 12) hours += 12;
+      if (newCountdownPeriod === 'AM' && hours === 12) hours = 0;
+      targetDate.setHours(hours, parseInt(newCountdownMinute), 0, 0);
       
       if (targetDate <= new Date()) {
         targetDate = addDays(targetDate, 1);
@@ -131,7 +147,9 @@ export const CountdownTimer = ({ isOpen, onClose }: CountdownTimerProps) => {
     setCountdowns(prev => [...prev, newItem]);
     setNewCountdownName('');
     setNewCountdownDate('');
-    setNewCountdownTime('');
+    setNewCountdownHour('12');
+    setNewCountdownMinute('00');
+    setNewCountdownPeriod('AM');
     setShowAddForm(false);
     toast.success('Countdown created');
   };
@@ -313,11 +331,15 @@ export const CountdownTimer = ({ isOpen, onClose }: CountdownTimerProps) => {
                 </div>
                 <div className="space-y-2">
                   <Label>Time (optional)</Label>
-                  <Input
-                    type="time"
-                    value={newCountdownTime}
-                    onChange={(e) => setNewCountdownTime(e.target.value)}
-                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                    onClick={() => setShowTimePicker(true)}
+                  >
+                    <Clock className="mr-2 h-4 w-4" />
+                    {getTimeDisplay()}
+                  </Button>
                 </div>
               </div>
 
@@ -499,6 +521,22 @@ export const CountdownTimer = ({ isOpen, onClose }: CountdownTimerProps) => {
           )}
         </div>
       </div>
+
+      {/* Clock Time Picker Dialog */}
+      <Dialog open={showTimePicker} onOpenChange={setShowTimePicker}>
+        <DialogContent className="max-w-sm">
+          <ClockTimePicker
+            hour={newCountdownHour}
+            minute={newCountdownMinute}
+            period={newCountdownPeriod}
+            onHourChange={setNewCountdownHour}
+            onMinuteChange={setNewCountdownMinute}
+            onPeriodChange={setNewCountdownPeriod}
+            onConfirm={() => setShowTimePicker(false)}
+            showConfirmButton={true}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
