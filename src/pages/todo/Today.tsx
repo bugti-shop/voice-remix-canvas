@@ -65,6 +65,8 @@ const Today = () => {
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('flat');
   const [hideDetails, setHideDetails] = useState<boolean>(false);
+  const [subtaskSwipeState, setSubtaskSwipeState] = useState<{ id: string; parentId: string; x: number; isSwiping: boolean } | null>(null);
+  const subtaskTouchStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   useEffect(() => {
     const saved = localStorage.getItem('todoItems');
@@ -644,6 +646,47 @@ const Today = () => {
     }));
   };
 
+  const deleteSubtask = (parentId: string, subtaskId: string) => {
+    setItems(items.map(item => {
+      if (item.id === parentId && item.subtasks) {
+        return {
+          ...item,
+          subtasks: item.subtasks.filter(st => st.id !== subtaskId)
+        };
+      }
+      return item;
+    }));
+  };
+
+  const handleSubtaskSwipeStart = (subtaskId: string, parentId: string, e: React.TouchEvent) => {
+    subtaskTouchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    setSubtaskSwipeState({ id: subtaskId, parentId, x: 0, isSwiping: false });
+  };
+
+  const handleSubtaskSwipeMove = (subtaskId: string, parentId: string, e: React.TouchEvent) => {
+    if (!subtaskSwipeState || subtaskSwipeState.id !== subtaskId) return;
+    const deltaX = e.touches[0].clientX - subtaskTouchStartRef.current.x;
+    const deltaY = Math.abs(e.touches[0].clientY - subtaskTouchStartRef.current.y);
+    
+    if (deltaY < 30) {
+      const clampedX = Math.max(-120, Math.min(120, deltaX));
+      setSubtaskSwipeState({ id: subtaskId, parentId, x: clampedX, isSwiping: true });
+    }
+  };
+
+  const handleSubtaskSwipeEnd = async (subtask: TodoItem, parentId: string) => {
+    if (!subtaskSwipeState || subtaskSwipeState.id !== subtask.id) return;
+    
+    if (subtaskSwipeState.x < -SWIPE_THRESHOLD) {
+      try { await Haptics.impact({ style: ImpactStyle.Medium }); } catch {}
+      deleteSubtask(parentId, subtask.id);
+    } else if (subtaskSwipeState.x > SWIPE_THRESHOLD) {
+      try { await Haptics.impact({ style: ImpactStyle.Heavy }); } catch {}
+      updateSubtask(parentId, subtask.id, { completed: !subtask.completed });
+    }
+    setSubtaskSwipeState(null);
+  };
+
   const renderTaskItem = (item: TodoItem) => {
     const hasSubtasks = item.subtasks && item.subtasks.length > 0;
     const currentSwipe = swipeState?.id === item.id ? swipeState : null;
@@ -979,31 +1022,61 @@ const Today = () => {
                     {renderTaskItem(item)}
                   </div>
                 )}
-                renderSubtask={(subtask, parentId, isDragging) => (
-                  <div 
-                    className={cn(
-                      "flex items-start gap-3 py-2 px-3 border-b border-border/30 last:border-b-0 cursor-pointer hover:bg-muted/30 transition-colors",
-                      isDragging && "bg-card shadow-lg"
-                    )}
-                    onClick={() => setSelectedSubtask({ subtask, parentId })}
-                  >
-                    <Checkbox
-                      checked={subtask.completed}
-                      onCheckedChange={async (checked) => {
-                        updateSubtask(parentId, subtask.id, { completed: !!checked });
-                        if (checked) try { await Haptics.impact({ style: ImpactStyle.Light }); } catch {}
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className={cn(
-                        "h-4 w-4 rounded-sm mt-0.5 flex-shrink-0",
-                        subtask.completed ? "bg-muted-foreground/30 border-0" : "border-2 border-muted-foreground/40"
-                      )}
-                    />
-                    <span className={cn("text-sm flex-1", subtask.completed && "text-muted-foreground")}>
-                      {subtask.text}
-                    </span>
-                  </div>
-                )}
+                renderSubtask={(subtask, parentId, isDragging) => {
+                  const currentSubtaskSwipe = subtaskSwipeState?.id === subtask.id ? subtaskSwipeState : null;
+                  
+                  return (
+                    <div className="relative overflow-hidden">
+                      {/* Swipe action backgrounds */}
+                      <div className="absolute inset-0 flex">
+                        <div className={cn(
+                          "flex-1 flex items-center justify-start pl-4 transition-colors",
+                          currentSubtaskSwipe && currentSubtaskSwipe.x > SWIPE_THRESHOLD ? "bg-green-500" : "bg-green-500/70"
+                        )}>
+                          <Check className="h-4 w-4 text-white" />
+                        </div>
+                        <div className={cn(
+                          "flex-1 flex items-center justify-end pr-4 transition-colors",
+                          currentSubtaskSwipe && currentSubtaskSwipe.x < -SWIPE_THRESHOLD ? "bg-red-500" : "bg-red-500/70"
+                        )}>
+                          <TrashIcon className="h-4 w-4 text-white" />
+                        </div>
+                      </div>
+                      
+                      {/* Subtask content */}
+                      <div 
+                        className={cn(
+                          "flex items-start gap-3 py-2 px-3 border-b border-border/30 last:border-b-0 cursor-pointer bg-muted/10 transition-colors",
+                          isDragging && "bg-card shadow-lg"
+                        )}
+                        style={{ 
+                          transform: `translateX(${currentSubtaskSwipe?.x || 0}px)`, 
+                          transition: currentSubtaskSwipe?.isSwiping ? 'none' : 'transform 0.3s ease-out' 
+                        }}
+                        onClick={() => !currentSubtaskSwipe?.isSwiping && setSelectedSubtask({ subtask, parentId })}
+                        onTouchStart={(e) => handleSubtaskSwipeStart(subtask.id, parentId, e)}
+                        onTouchMove={(e) => handleSubtaskSwipeMove(subtask.id, parentId, e)}
+                        onTouchEnd={() => handleSubtaskSwipeEnd(subtask, parentId)}
+                      >
+                        <Checkbox
+                          checked={subtask.completed}
+                          onCheckedChange={async (checked) => {
+                            updateSubtask(parentId, subtask.id, { completed: !!checked });
+                            if (checked) try { await Haptics.impact({ style: ImpactStyle.Light }); } catch {}
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className={cn(
+                            "h-4 w-4 rounded-sm mt-0.5 flex-shrink-0",
+                            subtask.completed ? "bg-muted-foreground/30 border-0" : "border-2 border-muted-foreground/40"
+                          )}
+                        />
+                        <span className={cn("text-sm flex-1", subtask.completed && "text-muted-foreground")}>
+                          {subtask.text}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }}
               />
               {/* Completed Section */}
               {showCompleted && completedItems.length > 0 && (
