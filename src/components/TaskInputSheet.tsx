@@ -193,28 +193,32 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
       await Haptics.impact({ style: ImpactStyle.Light });
     } catch {}
 
-    // Use natural language parsing to extract date/time/priority from text
+    // Use natural language parsing to extract date/time/priority/repeat/location from text
     const parsed = taskText.trim() ? parseNaturalLanguageTask(taskText) : null;
     
     // Use parsed values if available, otherwise use manually set values
     const finalText = parsed?.text || taskText || (voiceRecording ? 'Voice Task' : '');
     const finalDueDate = dueDate || parsed?.dueDate;
     const finalPriority = priority !== 'none' ? priority : parsed?.priority;
+    const finalRepeatType = repeatType !== 'none' ? repeatType : parsed?.repeatType;
+    const finalRepeatDays = repeatType === 'custom' && repeatDays.length > 0 ? repeatDays : parsed?.repeatDays;
+    const finalLocation = location.trim() || parsed?.location;
+    const finalReminderTime = reminderTime || deadlineReminderTime || parsed?.reminderTime;
 
     const mainTask: Omit<TodoItem, 'id' | 'completed'> = {
       text: finalText,
       priority: finalPriority,
       dueDate: finalDueDate,
-      reminderTime: reminderTime || deadlineReminderTime,
-      repeatType: repeatType !== 'none' ? repeatType : undefined,
-      repeatDays: repeatType === 'custom' && repeatDays.length > 0 ? repeatDays : undefined,
+      reminderTime: finalReminderTime,
+      repeatType: finalRepeatType,
+      repeatDays: finalRepeatDays,
       folderId,
       sectionId,
       imageUrl,
       coloredTags: coloredTags.length > 0 ? coloredTags : undefined,
       voiceRecording,
       description: description.trim() || undefined,
-      location: location.trim() || undefined,
+      location: finalLocation,
     };
 
     // If deadline is set, store it in dueDate
@@ -597,7 +601,7 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
           </div>
 
           {/* Natural Language Parsing Preview */}
-          {hasNLPPatterns && parsedTask && (parsedTask.dueDate || parsedTask.priority) && (
+          {hasNLPPatterns && parsedTask && (parsedTask.dueDate || parsedTask.priority || parsedTask.repeatType || parsedTask.location) && (
             <div className="flex items-center gap-2 mb-3 px-1 flex-wrap">
               <Sparkles className="h-3.5 w-3.5 text-primary flex-shrink-0" />
               <span className="text-xs text-muted-foreground">Detected:</span>
@@ -605,6 +609,20 @@ export const TaskInputSheet = ({ isOpen, onClose, onAddTask, folders, selectedFo
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary">
                   <CalendarIcon className="h-3 w-3" />
                   {format(parsedTask.dueDate, 'MMM d, h:mm a')}
+                </span>
+              )}
+              {parsedTask.repeatType && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-purple-500/10 text-purple-500">
+                  <Timer className="h-3 w-3" />
+                  {parsedTask.repeatType === 'custom' && parsedTask.repeatDays 
+                    ? `Every ${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].filter((_, i) => parsedTask.repeatDays?.includes(i)).join(', ')}`
+                    : parsedTask.repeatType}
+                </span>
+              )}
+              {parsedTask.location && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-blue-500/10 text-blue-500">
+                  <MapPin className="h-3 w-3" />
+                  {parsedTask.location}
                 </span>
               )}
               {parsedTask.priority && (
