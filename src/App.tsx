@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Notes from "./pages/Notes";
 import NotesCalendar from "./pages/NotesCalendar";
+import WebClipper from "./pages/WebClipper";
 import Settings from "./pages/Settings";
 import Reminders from "./pages/Reminders";
 import Today from "./pages/todo/Today";
@@ -34,6 +35,7 @@ const AppContent = () => {
           <Route path="/" element={<Index />} />
           <Route path="/notes" element={<Notes />} />
           <Route path="/calendar" element={<NotesCalendar />} />
+          <Route path="/clip" element={<WebClipper />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/reminders" element={<Reminders />} />
           <Route path="/todo/today" element={<Today />} />

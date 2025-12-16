@@ -1,7 +1,8 @@
 import { BottomNavigation } from '@/components/BottomNavigation';
-import { ChevronRight, Settings as SettingsIcon } from 'lucide-react';
+import { ChevronRight, Settings as SettingsIcon, Scissors } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
+import BookmarkletSetup from '@/components/BookmarkletSetup';
 import appLogo from '@/assets/app-logo.png';
 import {
   AlertDialog,
@@ -28,6 +29,7 @@ const Settings = () => {
   const [showTermsDialog, setShowTermsDialog] = useState(false);
   const [showPrivacyDialog, setShowPrivacyDialog] = useState(false);
   const [showHelpDialog, setShowHelpDialog] = useState(false);
+  const [showClipperDialog, setShowClipperDialog] = useState(false);
 
   const handleBackupData = () => {
     const notes = localStorage.getItem('notes') || '[]';
@@ -111,6 +113,7 @@ const Settings = () => {
   };
 
   const settingsItems = [
+    { label: 'Web Clipper', onClick: () => setShowClipperDialog(true), icon: Scissors },
     { label: 'Back up data', onClick: handleBackupData },
     { label: 'Restore data', onClick: handleRestoreData },
     { label: 'Download my data', onClick: handleDownloadData },
@@ -337,6 +340,13 @@ const Settings = () => {
               </section>
             </div>
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Web Clipper Dialog */}
+      <Dialog open={showClipperDialog} onOpenChange={setShowClipperDialog}>
+        <DialogContent className="max-w-md">
+          <BookmarkletSetup />
         </DialogContent>
       </Dialog>
     </div>
