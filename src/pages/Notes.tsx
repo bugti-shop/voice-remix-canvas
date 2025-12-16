@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { Note } from '@/types/note';
 import { NoteEditor } from '@/components/NoteEditor';
-import { Layers, Settings, Pin, Download, ListTodo } from 'lucide-react';
+import { Layers, Settings, Pin, Download, ListTodo, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { exportNoteToDocx } from '@/utils/exportToDocx';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import appLogo from '@/assets/app-logo.png';
+import URLClipperSheet from '@/components/URLClipperSheet';
 
 const STICKY_COLORS: Record<string, string> = {
   yellow: 'hsl(var(--sticky-yellow))',
@@ -37,6 +38,7 @@ const Notes = () => {
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isClipperOpen, setIsClipperOpen] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('notes');
@@ -55,7 +57,13 @@ const Notes = () => {
   }, []);
 
   const handleSaveNote = (note: Note) => {
-    const updatedNotes = notes.map((n) => (n.id === note.id ? note : n));
+    const existingIndex = notes.findIndex((n) => n.id === note.id);
+    let updatedNotes;
+    if (existingIndex >= 0) {
+      updatedNotes = notes.map((n) => (n.id === note.id ? note : n));
+    } else {
+      updatedNotes = [note, ...notes];
+    }
     setNotes(updatedNotes);
     localStorage.setItem('notes', JSON.stringify(updatedNotes));
   };
@@ -156,6 +164,15 @@ const Notes = () => {
               <Button
                 size="icon"
                 variant="ghost"
+                onClick={() => setIsClipperOpen(true)}
+                title="Clip from URL"
+                className="h-10 w-10"
+              >
+                <Link2 className="h-5 w-5" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
                 onClick={() => navigate('/todo/today')}
                 title="Switch to To-Do"
                 className="h-10 w-10"
@@ -247,6 +264,12 @@ const Notes = () => {
           setIsEditorOpen(false);
           setSelectedNote(null);
         }}
+        onSave={handleSaveNote}
+      />
+
+      <URLClipperSheet
+        isOpen={isClipperOpen}
+        onClose={() => setIsClipperOpen(false)}
         onSave={handleSaveNote}
       />
 
